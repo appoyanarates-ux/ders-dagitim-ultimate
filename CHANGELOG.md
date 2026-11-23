@@ -2,6 +2,10 @@
 
 Tüm sürümler Semantik Sürümleme (`MAJOR.MINOR.PATCH`) düzenini izler.
 
+## [1.0.4] — 2026-11-23
+- Arayüzdeki teknik motor ifadeleri sadeleştirildi.
+- Dağıtım esnasında çıkan uyarılara ve yerleşemeyen bloklara (ör. "5/A: Görsel Sanatlar için öğretmen atanmamış") doğrudan ilgili şube/ders/öğretmene tek tıkla götüren hızlı düzeltme bağlantıları eklendi.
+
 ## [1.0.3] — 2026-11-23
 - Öğretmen varsayılan saat sınırları Min 1 / Maks 30, Günlük Maks okulun günlük ders saatine dinamik bağlandı.
 - Öğretmenlere ekstra okutabilecekleri dersler ve Görev/Unvan (Öğretmen / Okul Müdürü / Müdür Yardımcısı) eklendi; Menü 4'e "Ek Okutabileceği Derslere Göre Dağıt" eklendi.

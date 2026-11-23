@@ -1397,7 +1397,7 @@
     const s7Rows = [
       ['Gösterge', 'Değer', 'Açıklama'].map(sanitizeExcelCell),
       ['Program Durumu', (valInfo.isValid ? 'DOĞRULANMIŞ GEÇERLİ PROGRAM' : 'TASLAK – DOĞRULANMAMIŞ') + draftPrefix, valInfo.message].map(sanitizeExcelCell),
-      ['Doğrulama Zamanı', valInfo.validatedAt, 'Google OR-Tools CP-SAT'].map(sanitizeExcelCell),
+      ['Doğrulama Zamanı', valInfo.validatedAt, 'Otomatik Dağıtım Motoru'].map(sanitizeExcelCell),
       ['Toplam Şube Sayısı', rep.summary.totalClasses, ''].map(sanitizeExcelCell),
       ['Toplam Öğretmen Sayısı', rep.summary.totalTeachers, ''].map(sanitizeExcelCell),
       ['Haftalık Hedef Ders Yükü', rep.summary.totalTargetHours, 'Saat'].map(sanitizeExcelCell),

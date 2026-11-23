@@ -31,16 +31,16 @@ async function runStartupChecks({
     engineInfo = await getEngineInfo();
     checks.push({
       id: 'ortools_engine',
-      label: 'Google OR-Tools CP-SAT Motoru',
+      label: 'Otomatik Dağıtım Motoru',
       ok: Boolean(engineInfo && engineInfo.available),
       detail: engineInfo && engineInfo.available
-        ? `Hazır (OR-Tools ${engineInfo.ortools_version || '?'}, Python ${engineInfo.python_version || '?'})`
-        : ((engineInfo && engineInfo.error) || 'OR-Tools yardımcı motoru başlatılamadı.')
+        ? `Hazır (v${engineInfo.ortools_version || '1.0'})`
+        : ((engineInfo && engineInfo.error) || 'Dağıtım motoru başlatılamadı.')
     });
   } catch (err) {
     checks.push({
       id: 'ortools_engine',
-      label: 'Google OR-Tools CP-SAT Motoru',
+      label: 'Otomatik Dağıtım Motoru',
       ok: false,
       detail: `Motor kontrolü başarısız: ${err.message}`
     });

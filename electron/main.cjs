@@ -294,7 +294,8 @@ function runOrToolsSolve(config) {
         try {
           const msg = JSON.parse(trimmed);
           if (msg && msg.type === 'progress' && activeSolve && activeSolve.requestId === requestId) {
-            sendProgress({ phase: msg.phase, message: msg.message });
+            const cleanMsg = String(msg.message || '').replace(/Google\s+OR-Tools|OR-Tools/gi, 'Dağıtım motoru');
+            sendProgress({ phase: msg.phase, message: cleanMsg });
           }
         } catch (_e) {
           // JSON olmayan stderr satırı

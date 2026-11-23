@@ -2461,18 +2461,88 @@ function stopOrToolsSolver(manualStop = true) {
 
 function validateBeforeSolve(cfg) {
   const problems = [];
-  if (!cfg.classes.length) problems.push('Önce sınıf ve şube ekleyin.');
-  if (!cfg.assignments.length) problems.push('Dağıtılacak ders bulunmuyor.');
-  if (!cfg.teachers.length) problems.push('Öğretmen ekleyin.');
+  if (!cfg.classes.length) {
+    problems.push({ message: 'Önce sınıf ve şube ekleyin.', nav: { view: 'menu2' }, linkLabel: 'Şube Ekle →' });
+  }
+  if (!cfg.assignments.length) {
+    problems.push({ message: 'Dağıtılacak ders bulunmuyor.', nav: { view: 'menu2' }, linkLabel: 'Derslere Git →' });
+  }
+  if (!cfg.teachers.length) {
+    problems.push({ message: 'Öğretmen ekleyin.', nav: { view: 'menu3' }, linkLabel: 'Öğretmen Ekle →' });
+  }
   for (const a of cfg.assignments) {
     if (!Array.isArray(a.teacher_ids) || !a.teacher_ids.length) {
-      problems.push(`${a.class_name}: ${a.course_name} için öğretmen atanmamış.`);
+      problems.push({
+        message: `${a.class_name}: ${a.course_name} için öğretmen atanmamış.`,
+        nav: { view: 'menu4', classId: a.class_id, search: a.course_name },
+        linkLabel: `${a.class_name} Dersine Git →`
+      });
     }
     if (!a.blocks || !a.blocks.length || a.blocks.reduce((sum, v) => sum + v, 0) !== a.hours) {
-      problems.push(`${a.class_name}: ${a.course_name} blok toplamı ile ders saati eşleşmiyor.`);
+      problems.push({
+        message: `${a.class_name}: ${a.course_name} blok toplamı ile ders saati eşleşmiyor.`,
+        nav: { view: 'menu2', classId: a.class_id },
+        linkLabel: `${a.class_name} Bloklarını Düzelt →`
+      });
     }
   }
   return problems;
+}
+
+function inferDiagnosticNav(diag) {
+  if (diag && diag.nav) return { nav: diag.nav, linkLabel: diag.linkLabel || 'Düzeltmek İçin Git →' };
+  const msg = String((diag && diag.message) || diag || '');
+  const classes = getCurrentClasses();
+  const teachers = getCurrentTeachers();
+
+  // Şube eşleşmesi (ör. "5/A: Görsel Sanatlar...")
+  for (const cls of classes) {
+    if (cls.name && msg.includes(cls.name)) {
+      if (/öğretmen atanmamış|atanmamış/i.test(msg)) {
+        return { nav: { view: 'menu4', classId: cls.id }, linkLabel: `${cls.name} Ders Atamasına Git →` };
+      }
+      if (/blok|ders saati/i.test(msg)) {
+        return { nav: { view: 'menu2', classId: cls.id }, linkLabel: `${cls.name} Bloklarına Git →` };
+      }
+      return { nav: { view: 'menu4', classId: cls.id }, linkLabel: `${cls.name} İçin Git →` };
+    }
+  }
+  // Öğretmen eşleşmesi
+  for (const t of teachers) {
+    if (t.name && msg.includes(t.name)) {
+      return { nav: { view: 'menu3', teacherId: t.id }, linkLabel: `${t.name} Ayarlarına Git →` };
+    }
+  }
+  if (/öğle|zil|kapalı gün|slot|zaman/i.test(msg)) {
+    return { nav: { view: 'menu1' }, linkLabel: 'Zaman Çizelgesine Git →' };
+  }
+  if (/derslik|mekan|laboratuvar|salon/i.test(msg)) {
+    return { nav: { view: 'menu4' }, linkLabel: 'Özel Dersliklere Git →' };
+  }
+  if (/öğretmen/i.test(msg)) {
+    return { nav: { view: 'menu3' }, linkLabel: 'Öğretmenlere Git →' };
+  }
+  return { nav: { view: 'menu4' }, linkLabel: 'Ders Atamaya Git →' };
+}
+
+function navigateFromWarningLink(nav) {
+  if (!nav || !nav.view) return;
+  state.activeView = nav.view;
+  if (nav.view === 'menu3' && nav.teacherId) state.selectedTeacherId = nav.teacherId;
+  if (nav.view === 'menu4') {
+    if (nav.classId) state.m4ClassFilter = nav.classId;
+    if (nav.search !== undefined) {
+      state.m4Search = nav.search;
+      const sInp = document.getElementById('m4Search');
+      if (sInp) sInp.value = nav.search;
+    }
+  }
+  if (nav.view === 'menu6') {
+    if (nav.tab) state.m6Tab = nav.tab;
+    if (nav.entityId) state.m6EntityId = nav.entityId;
+  }
+  saveState();
+  renderAll();
 }
 
 function formatFriendlyStatus(status) {
@@ -2496,7 +2566,7 @@ function openPreviewModal(result, metaLabel) {
   const gridStats = getSlotStats();
   const fmtSlot = (d, p) => (d === null || d === undefined) ? 'Yeni' : `${DAY_SHORT[gridStats.activeDayIndices[d]] || ('G' + (d + 1))} ${p + 1}. ders`;
 
-  document.getElementById('previewModalTitle').textContent = `Değişiklik Önizleme — ${metaLabel || 'OR-Tools Önerisi'}`;
+  document.getElementById('previewModalTitle').textContent = `Değişiklik Önizleme — ${metaLabel || 'Otomatik Dağıtım Önerisi'}`;
   document.getElementById('previewModalKpis').innerHTML = `
     <div class="bg-white rounded-xl border border-slate-200 p-2.5 text-center"><div class="text-[10px] text-slate-500">Değişen Ders Bloğu</div><div class="text-lg font-bold text-indigo-700">${diff.changedCount}</div></div>
     <div class="bg-white rounded-xl border border-slate-200 p-2.5 text-center"><div class="text-[10px] text-slate-500">Etkilenen Öğretmen</div><div class="text-lg font-bold text-slate-900">${diff.affectedTeacherCount}</div></div>
@@ -2561,7 +2631,7 @@ function openSwapModal(plA, plB) {
       : `<div class="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-900 space-y-1">
           <div class="font-bold">Doğrudan takas yapılamıyor:</div>
           <div>${escapeHtml(check.error)}</div>
-          <div class="text-[11px] text-slate-600 pt-1">İsterseniz “OR-Tools ile Uygun Yer Ara” seçeneğiyle mevcut programı en az değişiklikle düzenleyebilirsiniz.</div>
+          <div class="text-[11px] text-slate-600 pt-1">İsterseniz “Otomatik Uygun Yer Ara” seçeneğiyle mevcut programı en az değişiklikle düzenleyebilirsiniz.</div>
         </div>`}
   `;
 
@@ -2602,7 +2672,7 @@ async function runScheduleAudit(targetPanelId = null) {
     if (!seenMsgs.has(msg)) {
       allErrors.push({
         severity: 'error',
-        category: 'OR-Tools Bağımsız Doğrulama Hatası',
+        category: 'Bağımsız Doğrulama Hatası',
         address: 'Menü 5 / Menü 6 → Çözüm Doğrulama',
         message: msg,
         nav: { view: 'menu6', tab: 'report' }
@@ -2625,7 +2695,7 @@ async function runScheduleAudit(targetPanelId = null) {
       <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
         <div class="flex items-center gap-2 text-rose-700 font-bold text-sm"><i data-lucide="alert-triangle" class="w-5 h-5"></i> ${allErrors.length} Hata Tespit Edildi (Tam Adres Listesi)</div>
         <div class="flex items-center gap-2">
-          <button type="button" id="btnAuditFixOrTools" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition"><i data-lucide="wrench" class="w-3.5 h-3.5"></i> OR-Tools ile Düzelt</button>
+          <button type="button" id="btnAuditFixOrTools" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition"><i data-lucide="wrench" class="w-3.5 h-3.5"></i> Otomatik Düzelt</button>
           <button type="button" class="btn-close-audit text-xs text-slate-400 hover:text-slate-700">Kapat</button>
         </div>
       </div>
@@ -2669,22 +2739,22 @@ async function startOrToolsSolver(keepPinned = true, onlyUnplaced = false, scope
   if (solverRunning) return;
   const api = window.dersDagitimAPI;
   if (!api || typeof api.solveTimetable !== 'function') {
-    showToast('HTML önizleme modundasınız. Otomatik dağıtım Windows uygulamasında OR-Tools ile çalışır.');
+    showToast('HTML önizleme modundasınız. Otomatik dağıtım Windows uygulamasında çalışır.');
     return;
   }
   const cfg = buildOrToolsConfig();
   const problems = validateBeforeSolve(cfg);
   if (problems.length) {
-    state.lastSolveError = { status: 'INFEASIBLE', message: problems[0], diagnostics: problems.map((m) => ({ message: m })) };
+    state.lastSolveError = { status: 'INFEASIBLE', message: problems[0].message, diagnostics: problems };
     saveState(); renderMenu5();
-    showToast(problems[0]);
+    showToast(problems[0].message);
     return;
   }
 
   const oldPlacements = Array.isArray(state.solution && state.solution.placements) ? state.solution.placements : [];
   let mode = onlyUnplaced ? 'fill_empty' : (keepPinned ? 'full_solve' : 'regenerate');
   let showPreview = Boolean(scopeOpts && scopeOpts.preview);
-  let previewLabel = 'OR-Tools Önerisi';
+  let previewLabel = 'Otomatik Dağıtım Önerisi';
 
   if (scopeOpts && scopeOpts.mode === 'repair_min_changes') {
     mode = 'repair_min_changes';
@@ -2747,14 +2817,14 @@ async function startOrToolsSolver(keepPinned = true, onlyUnplaced = false, scope
     const result = await api.solveTimetable(cfg);
     if (currentRequest !== activeSolveRequest) return;
     if (!result || result.engine !== REQUIRED_SOLVER || !Array.isArray(result.placements)) {
-      throw new Error('Beklenen OR-Tools sonucu alınamadı.');
+      throw new Error('Beklenen dağıtım sonucu alınamadı.');
     }
     if (result.status === 'CANCELLED') {
       showToast('Dağıtım durduruldu. Önceki program korundu.');
       return;
     }
     if (!['OPTIMAL', 'FEASIBLE', 'INFEASIBLE', 'UNKNOWN', 'MODEL_INVALID'].includes(result.status)) {
-      throw new Error('OR-Tools geçersiz durum döndürdü.');
+      throw new Error('Dağıtım motoru geçersiz durum döndürdü.');
     }
 
     if (result.status === 'OPTIMAL' || result.status === 'FEASIBLE') {
@@ -2787,7 +2857,7 @@ async function startOrToolsSolver(keepPinned = true, onlyUnplaced = false, scope
     if (currentRequest === activeSolveRequest) {
       const msg = (err && err.message) ? err.message : 'Bilinmeyen hata';
       state.lastSolveError = { status: 'ERROR', message: msg, diagnostics: [{ message: msg }] };
-      showToast('OR-Tools hatası: ' + msg);
+      showToast('Dağıtım hatası: ' + msg);
     }
   } finally {
     if (currentRequest === activeSolveRequest) {
@@ -3232,7 +3302,7 @@ function renderMenu5() {
       <div class="text-lg font-bold mt-1 ${state.solution ? (state.solution.status === 'OPTIMAL' || state.solution.status === 'FEASIBLE' ? 'text-emerald-600' : 'text-amber-600') : 'text-slate-400'}">
         ${state.solution ? `${state.solution.placed_blocks}/${state.solution.total_blocks} blok` : 'Çalıştırılmadı'}
       </div>
-      <div class="text-xs text-slate-500 mt-0.5">${state.solution ? `${state.solution.engine === 'google_ortools_cp_sat' ? 'Google OR-Tools' : 'Elle düzenleme'} · ${state.solution.solve_time_sec || 0} sn` : 'Dağıtım bekleniyor'}</div>
+      <div class="text-xs text-slate-500 mt-0.5">${state.solution ? `${state.solution.engine === 'google_ortools_cp_sat' ? 'Otomatik Dağıtım' : 'Elle düzenleme'} · ${state.solution.solve_time_sec || 0} sn` : 'Dağıtım bekleniyor'}</div>
     </div>
   `;
 
@@ -3244,25 +3314,35 @@ function renderMenu5() {
     const hasBridge = typeof (window.dersDagitimAPI && window.dersDagitimAPI.solveTimetable) === 'function';
     if (!hasBridge) {
       engineBanner.className = 'rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900';
-      engineBanner.textContent = 'HTML önizleme modundasınız. Otomatik dağıtım Windows uygulamasında OR-Tools ile çalışır.';
+      engineBanner.textContent = 'HTML önizleme modundasınız. Otomatik dağıtım Windows uygulamasında çalışır.';
     } else if (engineInfoState.checked && !engineInfoState.available) {
       engineBanner.className = 'rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs text-rose-800';
-      engineBanner.textContent = `OR-Tools çözücü başlatılamadı: ${engineInfoState.error || 'Bilinmeyen hata'}`;
+      engineBanner.textContent = `Dağıtım motoru başlatılamadı: ${engineInfoState.error || 'Bilinmeyen hata'}`;
     } else {
       engineBanner.className = 'rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs text-emerald-900';
-      engineBanner.innerHTML = `<span class="font-bold">Google OR-Tools hazır</span>${engineInfoState.version ? ` (sürüm ${escapeHtml(engineInfoState.version)})` : ''}. Dağıtım internetsiz olarak yerel çözücüyle çalışır.`;
+      engineBanner.innerHTML = `<span class="font-bold">Dağıtım motoru hazır</span>. Dağıtım internetsiz olarak yerel motorla çalışır.`;
     }
   }
 
   const statusCard = document.getElementById('m5SolveStatusCard');
   let errBanner = '';
+  let resolvedDiags = [];
   if (state.lastSolveError) {
     const err = state.lastSolveError;
     const diags = Array.isArray(err.diagnostics) ? err.diagnostics : [];
+    resolvedDiags = diags.slice(0, 20).map((d) => {
+      const info = inferDiagnosticNav(d);
+      return { message: (d && d.message) || String(d), nav: info.nav, linkLabel: info.linkLabel };
+    });
     errBanner = `
-      <div class="rounded-xl bg-rose-50 border border-rose-200 p-4 text-xs text-rose-900 space-y-1.5">
+      <div class="rounded-xl bg-rose-50 border border-rose-200 p-4 text-xs text-rose-900 space-y-2">
         <div class="font-bold">${escapeHtml(formatFriendlyStatus(err.status))}: ${escapeHtml(err.message)}</div>
-        ${diags.length ? `<div class="space-y-1 pt-1">${diags.slice(0, 10).map((d) => `<div>• ${escapeHtml(d.message || d)}</div>`).join('')}</div>` : ''}
+        ${resolvedDiags.length ? `<div class="space-y-1.5 pt-1">${resolvedDiags.map((d, idx) => `
+          <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/80 border border-rose-200/80 px-2.5 py-1.5">
+            <span>• ${escapeHtml(d.message)}</span>
+            <button type="button" data-diag-idx="${idx}" class="m5-diag-link shrink-0 px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold transition">${escapeHtml(d.linkLabel)}</button>
+          </div>
+        `).join('')}</div>` : ''}
         ${state.solution ? '<div class="text-[11px] text-rose-700 pt-1">Önceki geçerli ders programınız korundu.</div>' : ''}
       </div>
     `;
@@ -3288,7 +3368,7 @@ function renderMenu5() {
           <span class="w-2.5 h-2.5 rounded-full ${okAll ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
           <h3 class="text-sm font-bold text-slate-900">Çözüm Özeti (${escapeHtml(sol.status)})</h3>
         </div>
-        <span class="text-xs font-semibold px-2.5 py-0.5 rounded bg-slate-100 text-slate-700">${sol.engine === 'google_ortools_cp_sat' ? 'Google OR-Tools' : 'Elle düzenleme'} · ${sol.solve_time_sec || 0} sn · Toplam pencere: ${totalGaps}</span>
+        <span class="text-xs font-semibold px-2.5 py-0.5 rounded bg-slate-100 text-slate-700">${sol.engine === 'google_ortools_cp_sat' ? 'Otomatik Dağıtım' : 'Elle düzenleme'} · ${sol.solve_time_sec || 0} sn · Toplam pencere: ${totalGaps}</span>
       </div>
       <div class="grid grid-cols-3 gap-3 text-center">
         <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
@@ -3305,12 +3385,27 @@ function renderMenu5() {
         </div>
       </div>
       ${(sol.unplaced && sol.unplaced.length) ? `
-        <div class="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800 space-y-1">
+        <div class="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800 space-y-1.5">
           <div class="font-bold">Yerleşemeyen Bloklar:</div>
-          ${sol.unplaced.slice(0, 8).map((u) => `<div>• ${escapeHtml(u.class_name)} — ${escapeHtml(u.course_name)} (${Number(u.length) || 0} sa)</div>`).join('')}
+          ${sol.unplaced.slice(0, 12).map((u, idx) => `
+            <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/80 border border-rose-200 px-2.5 py-1">
+              <span>• ${escapeHtml(u.class_name)} — ${escapeHtml(u.course_name)} (${Number(u.length) || 0} sa)</span>
+              <button type="button" data-unp-idx="${idx}" class="m5-unplaced-link px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold">Derse Git →</button>
+            </div>
+          `).join('')}
         </div>` : ''}
     `;
   }
+
+  statusCard.querySelectorAll('.m5-diag-link').forEach((btn) => btn.addEventListener('click', () => {
+    const item = resolvedDiags[Number(btn.dataset.diagIdx)];
+    if (item && item.nav) navigateFromWarningLink(item.nav);
+  }));
+  statusCard.querySelectorAll('.m5-unplaced-link').forEach((btn) => btn.addEventListener('click', () => {
+    const u = state.solution && state.solution.unplaced && state.solution.unplaced[Number(btn.dataset.unpIdx)];
+    if (!u) return;
+    navigateFromWarningLink({ view: 'menu4', classId: u.class_id || 'ALL', search: u.course_name || '' });
+  }));
 
   renderMenu5Templates();
   if (window.lucide) window.lucide.createIcons();
@@ -3771,7 +3866,7 @@ function renderMenu6() {
         <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto"><i data-lucide="table-2" class="w-6 h-6"></i></div>
         <div>
           <h3 class="text-base font-bold text-slate-900">Henüz Çözülmüş Ders Programı Yok</h3>
-          <p class="text-xs text-slate-500 max-w-md mx-auto mt-1">Program tablolarını görmek için <strong>Menü 5</strong>'ten OR-Tools ile dağıtımı başlatın veya <strong>Menü 7</strong>'den kayıtlı bir çözüm yükleyin.</p>
+          <p class="text-xs text-slate-500 max-w-md mx-auto mt-1">Program tablolarını görmek için <strong>Menü 5</strong>'ten otomatik dağıtımı başlatın veya <strong>Menü 7</strong>'den kayıtlı bir çözüm yükleyin.</p>
         </div>
         <button id="btnM6EmptyGo5" type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition">
           <i data-lucide="cpu" class="w-4 h-4"></i> Menü 5'e Git
@@ -3817,7 +3912,7 @@ function renderMenu6() {
           <i data-lucide="${s.isValid ? 'shield-check' : 'alert-triangle'}" class="w-4 h-4"></i>
           <span>${s.isValid ? 'DOĞRULANMIŞ GEÇERLİ PROGRAM — Tüm ders blokları eksiksiz ve çakışmasız yerleşmiş.' : `TASLAK / DOĞRULANMAMIŞ PROGRAM — ${s.violationCount} çakışma/kısıt ihlali, ${s.missingHoursTotal} eksik ders saati.`}</span>
         </div>
-        <span class="font-semibold">${state.solution.engine === 'google_ortools_cp_sat' ? 'Google OR-Tools CP-SAT' : 'Elle Düzenleme'}</span>
+        <span class="font-semibold">${state.solution.engine === 'google_ortools_cp_sat' ? 'Otomatik Dağıtım' : 'Elle Düzenleme'}</span>
       </div>
 
       <!-- 1. Genel Program Kalite Raporu -->
@@ -5205,7 +5300,7 @@ function bindEvents() {
     state.solution = pendingPreviewResult.result;
     state.lastSolveError = null;
     saveState(); updateUndoRedoButtons(); closePreview(); renderMenu5(); renderMenu6();
-    showToast('OR-Tools değişiklikleri uygulandı');
+    showToast('Dağıtım değişiklikleri uygulandı');
   });
 
   // Tüm Kilitleri Kaldır Onay Modalı Olayları

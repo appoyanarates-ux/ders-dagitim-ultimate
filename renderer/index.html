@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0f172a" />
-  <title>EvrakPlus – Okul Ders Dağıtım Programı — MEB 2026-2027 · OR-Tools</title>
+  <title>EvrakPlus – Okul Ders Dağıtım Programı — MEB 2026-2027</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="stylesheet" href="./assets/styles.css" />
   <script src="./assets/lucide.min.js"></script>
@@ -18,7 +18,7 @@
       <div class="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center font-bold text-sm">DD</div>
       <div>
         <div class="text-sm font-semibold leading-tight">Ders Dağıtım Programı</div>
-        <div class="text-[11px] text-slate-400">MEB 2026-2027 · OR-Tools</div>
+        <div class="text-[11px] text-slate-400">MEB 2026-2027</div>
       </div>
     </div>
     <button id="mobileMenuBtn" type="button" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200" aria-label="Menüyü Aç">
@@ -37,7 +37,7 @@
         </div>
         <div>
           <h1 class="text-sm font-bold tracking-tight text-white">Ders Dağıtım</h1>
-          <p class="text-xs text-slate-400">MEB 2026-2027 · OR-Tools</p>
+          <p class="text-xs text-slate-400">MEB 2026-2027</p>
         </div>
       </div>
       <button id="closeSidebarBtn" type="button" class="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800" aria-label="Menüyü Kapat">
@@ -99,7 +99,7 @@
       <p class="text-[11px] text-slate-500 text-center">Veriler yerel olarak otomatik saklanır</p>
       <button id="btnSidebarSettingsAbout" type="button" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-950/60 hover:bg-slate-800 border border-slate-800 text-[11px] font-medium text-slate-300 hover:text-white transition">
         <span class="inline-flex items-center gap-1.5"><i data-lucide="settings" class="w-3.5 h-3.5 text-slate-400"></i> Ayarlar ve Hakkında</span>
-        <span id="sidebarVersionTag" class="text-[10px] text-slate-400 font-mono">v1.0.3</span>
+        <span id="sidebarVersionTag" class="text-[10px] text-slate-400 font-mono">v1.0.4</span>
       </button>
     </div>
   </aside>
@@ -606,7 +606,7 @@
         <div>
           <div class="text-xs uppercase tracking-wider text-indigo-200 font-semibold">Sonraki Adım</div>
           <h4 class="text-lg font-bold mt-0.5">Menü 5: Ders Dağıtımı</h4>
-          <p class="text-xs sm:text-sm text-indigo-100/90 mt-1">Öğretmen atamalarını tamamlayın, ardından OR-Tools motoruyla ders programını oluşturun.</p>
+          <p class="text-xs sm:text-sm text-indigo-100/90 mt-1">Öğretmen atamalarını tamamlayın, ardından akıllı dağıtım motoruyla ders programını oluşturun.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2 shrink-0">
           <button id="btnM4BackToMenu3" type="button" class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition">
@@ -638,7 +638,7 @@
         <div class="bg-white rounded-2xl border border-indigo-200 shadow-sm p-4 sm:p-5 space-y-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex flex-wrap items-center gap-2">
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 text-xs font-bold"><i data-lucide="cpu" class="w-3.5 h-3.5"></i> Google OR-Tools Ders Dağıtımı</span>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 text-xs font-bold"><i data-lucide="cpu" class="w-3.5 h-3.5"></i> Otomatik Ders Dağıtımı</span>
               <span class="text-xs text-slate-500">Çakışmalar, müsaitlik, bloklar ve kilitler otomatik korunur.</span>
             </div>
             <label class="flex items-center gap-2 text-xs font-semibold text-slate-700">
@@ -677,7 +677,7 @@
           <div id="m5ProgressWrap" class="hidden rounded-xl bg-indigo-50 border border-indigo-100 px-3 py-3 space-y-2" aria-live="polite">
             <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
               <span id="m5ProgressLabel" class="font-bold text-indigo-900">Model kontrol ediliyor...</span>
-              <span id="m5ProgressMeta" class="font-medium text-indigo-700">OR-Tools çalışıyor</span>
+              <span id="m5ProgressMeta" class="font-medium text-indigo-700">Dağıtım motoru çalışıyor</span>
             </div>
             <div class="w-full h-2 rounded-full bg-indigo-100 overflow-hidden">
               <div class="h-full bg-indigo-600 w-1/3 animate-pulse rounded-full"></div>
@@ -1435,7 +1435,7 @@
       <div class="px-5 py-3.5 border-t border-slate-100 bg-slate-50 flex flex-wrap items-center justify-end gap-2">
         <button id="btnCancelSwap" type="button" class="px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">Vazgeç</button>
         <button id="btnSwapAskOrTools" type="button" class="hidden inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-xs font-bold text-white shadow-sm transition">
-          <i data-lucide="cpu" class="w-3.5 h-3.5"></i> OR-Tools ile Uygun Yer Ara
+          <i data-lucide="cpu" class="w-3.5 h-3.5"></i> Otomatik Uygun Yer Ara
         </button>
         <button id="btnConfirmSwap" type="button" class="hidden inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white shadow-sm transition">
           <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i> Takası Uygula
@@ -1444,12 +1444,12 @@
     </div>
   </div>
 
-  <!-- MODAL 8B: DEĞİŞİKLİK ÖNİZLEME EKRANI (OR-TOOLS ÖNERİSİ) -->
+  <!-- MODAL 8B: DEĞİŞİKLİK ÖNİZLEME EKRANI -->
   <div id="previewModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 p-4">
     <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl max-h-[88vh] flex flex-col overflow-hidden">
       <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
         <div>
-          <h3 id="previewModalTitle" class="text-sm font-bold text-slate-900">OR-Tools Değişiklik Önizleme</h3>
+          <h3 id="previewModalTitle" class="text-sm font-bold text-slate-900">Değişiklik Önizleme</h3>
           <p id="previewModalSub" class="text-xs text-slate-500 mt-0.5">Yeni öneriyi inceleyin; onaylayana kadar mevcut programınız değişmez.</p>
         </div>
         <button id="btnClosePreviewModal" type="button" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" aria-label="Kapat">
@@ -1831,7 +1831,7 @@
             <div id="aboutAppVersion" class="font-bold text-indigo-700 mt-0.5">v1.0.0</div>
           </div>
           <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
-            <div class="text-[11px] text-slate-500">OR-Tools Motoru</div>
+            <div class="text-[11px] text-slate-500">Dağıtım Motoru</div>
             <div id="aboutEngineVersion" class="font-bold text-emerald-700 mt-0.5">—</div>
           </div>
           <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">

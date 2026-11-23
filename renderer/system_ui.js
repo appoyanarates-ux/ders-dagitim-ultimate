@@ -66,7 +66,7 @@
       if (el('sidebarVersionTag')) el('sidebarVersionTag').textContent = `v${info.appVersion}`;
       if (el('aboutEngineVersion')) {
         el('aboutEngineVersion').textContent = info.engineInfo && info.engineInfo.available
-          ? `OR-Tools ${info.engineInfo.ortools_version || ''}`
+          ? `Hazır (v${info.engineInfo.ortools_version || '1.0'})`
           : 'Bulunamadı';
       }
       if (el('aboutLastCheck')) el('aboutLastCheck').textContent = formatDateTr(info.lastUpdateCheckAt);
@@ -226,7 +226,7 @@
         'Kısa Kullanım Özeti (Tam kılavuz: KULLANIM_KILAVUZU.md)\n' +
         '1. Menü 1: Okul türünü, zil saatlerini ve açık/kapalı saatleri belirleyin.\n' +
         '2. Menü 2-4: Şubeleri, öğretmenleri, uygunluk matrislerini ve ders bloklarını tanımlayın.\n' +
-        '3. Menü 5: Google OR-Tools CP-SAT ile otomatik dağıtımı başlatın (tamamen internetsiz ve ücretsiz).\n' +
+        '3. Menü 5: Otomatik dağıtımı başlatın (tamamen internetsiz ve ücretsiz).\n' +
         '4. Menü 6: Sürükle-bırak taşıma, kilitleme, bölgesel yeniden dağıtım ve EvrakPlus üyeliğiyle PDF/Excel çıktısı alın.\n' +
         '5. Menü 7: Yerel yedek veya isteğe bağlı EvrakPlus bulut senkronizasyonu yapın.';
       box.classList.remove('hidden');
@@ -237,7 +237,7 @@
       if (!box) return;
       box.textContent =
         'Üçüncü Taraf Açık Kaynak Bildirimleri:\n' +
-        '• Google OR-Tools (Apache-2.0 License)\n' +
+        '• Açık Kaynak Optimizasyon Motoru (Apache-2.0 License)\n' +
         '• Electron & electron-updater (MIT License)\n' +
         '• Tailwind CSS & Lucide Icons (MIT / ISC License)\n' +
         '• SheetJS / xlsx (Apache-2.0 License)\n' +
