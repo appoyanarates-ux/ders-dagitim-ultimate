@@ -2,6 +2,9 @@
 
 Tüm sürümler Semantik Sürümleme (`MAJOR.MINOR.PATCH`) düzenini izler.
 
+## [1.0.2] — 2026-11-23
+- Kod imzalama sertifikası gerektirmeden GitHub Releases üzerinden açılışta otomatik güncelleme kontrolü ve SHA-512 bütünlük doğrulamalı kullanıcı onaylı güncelleme akışı etkinleştirildi.
+
 ## [1.0.1] — 2026-11-23
 - iyileştirmeler (Resmi MEB ders programı çıktı şablonları: öğretmen programı, sınıf programı, öğretmen çarşaf ve sınıf çarşaf tasarımları; blok ders yatay `colspan` birleştirme, `Ders Listesi` alt tablosu ve imza düzeni).
 

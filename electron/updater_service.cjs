@@ -81,7 +81,9 @@ class UpdaterService {
     const ownerConfigured = Boolean(this.sec.githubOwner && this.sec.githubOwner !== UNCONFIGURED_OWNER_SENTINEL);
     const publisherConfigured = Boolean(this.sec.expectedPublisherName);
     const ed25519Configured = Boolean(this.sec.ed25519ManifestPublicKeyPem && this.sec.ed25519ManifestPublicKeyPem.includes('BEGIN PUBLIC KEY'));
-    this.productionUpdateReady = ownerConfigured && publisherConfigured && ed25519Configured;
+    // Kullanıcı tercihi: Windows kod imzalama sertifikası olmadan da GitHub Releases + SHA-512 ile güncelleme aktif
+    this.ed25519Required = ed25519Configured;
+    this.updateEnabled = ownerConfigured;
 
     this.state = {
       status: 'idle', // idle | checking | up-to-date | available | downloading | downloaded | offline | unconfigured | error
@@ -102,13 +104,13 @@ class UpdaterService {
         allowPrerelease: false,
         allowDowngrade: false,
         disableWebInstaller: true,
-        verifyUpdateCodeSignature: true,
+        verifyUpdateCodeSignature: publisherConfigured,
         provider: 'github',
         ownerConfigured,
         publisherConfigured,
         ed25519Configured,
-        productionUpdateReady: this.productionUpdateReady,
-        repo: this.sec.githubRepo || 'evrakplus-ders-dagitim'
+        updateEnabled: this.updateEnabled,
+        repo: this.sec.githubRepo || 'ders-dagitim-ultimate'
       }
     };
 
@@ -208,8 +210,8 @@ class UpdaterService {
    * Ed25519 manifest doğrulaması ise indirmeden önce bu metotla fail-closed biçimde zorunlu tutulur.
    */
   async verifyRemoteManifestSignature(targetVersion) {
-    if (!this.productionUpdateReady) {
-      throw new Error('Üretim güncelleme doğrulama anahtarları (GitHub depo sahibi, yayıncı adı, Ed25519 açık anahtarı) tanımlı değil.');
+    if (!this.ed25519Required) {
+      return { verified: false, skipped: true };
     }
     if (typeof this.fetchImpl !== 'function') {
       throw new Error('Manifest doğrulaması için HTTP istemcisi kullanılamıyor.');
@@ -243,11 +245,11 @@ class UpdaterService {
       try { this.backupService.savePrefs({ lastUpdateCheckAt: nowIso }); } catch (_e) {}
     }
 
-    if (!this.isPackaged || !this.autoUpdater || !this.productionUpdateReady) {
+    if (!this.isPackaged || !this.autoUpdater || !this.updateEnabled) {
       this._emit({
         status: 'unconfigured',
         lastCheckedAt: nowIso,
-        message: 'Bu derleme imzasız/yapılandırılmamış geliştirme adayıdır. Otomatik GitHub güncellemesi yalnızca yetkili depo, kod imzalama sertifikası ve Ed25519 açık anahtarıyla imzalanmış üretim sürümünde etkindir.'
+        message: 'Güncelleme kontrolü yalnızca kurulu masaüstü uygulamasında etkindir.'
       });
       return this.getState();
     }
@@ -270,21 +272,25 @@ class UpdaterService {
   }
 
   async downloadUpdate() {
-    if (!this.isPackaged || !this.autoUpdater || !this.productionUpdateReady) {
-      throw new Error('Güncelleme indirme yalnızca imzalı ve Ed25519 doğrulaması etkin üretim sürümünde desteklenir.');
+    if (!this.isPackaged || !this.autoUpdater || !this.updateEnabled) {
+      throw new Error('Güncelleme indirme yalnızca kurulu masaüstü uygulamasında desteklenir.');
     }
     if (this.state.status !== 'available' || !this.state.availableVersion) {
       throw new Error('İndirilecek yeni bir kararlı sürüm bulunmuyor.');
     }
-    // Adım 1: İndirmeden önce Ed25519 manifest imzasını doğrula (fail-closed!)
-    await this.verifyRemoteManifestSignature(this.state.availableVersion);
+    // Ed25519 açık anahtarı tanımlıysa indirmeden önce manifest imzasını doğrula
+    let sigVerified = false;
+    if (this.ed25519Required) {
+      await this.verifyRemoteManifestSignature(this.state.availableVersion);
+      sigVerified = true;
+    }
     this._emit({
       status: 'downloading',
-      manifestSignatureVerified: true,
+      manifestSignatureVerified: sigVerified,
       progressPercent: 0,
-      message: 'Manifest Ed25519 imzası doğrulandı. Güncelleme indiriliyor...'
+      message: 'Güncelleme indiriliyor...'
     });
-    // Adım 2: electron-updater .exe dosyasını indirir + SHA-512 + Windows Authenticode imzasını doğrular
+    // electron-updater HTTPS üzerinden .exe dosyasını indirir ve SHA-512 bütünlüğünü doğrular
     await this.autoUpdater.downloadUpdate();
     return this.getState();
   }

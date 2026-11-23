@@ -16,7 +16,7 @@ extraResources:
       - "**/*"
 win:
   icon: build/icon.ico
-  verifyUpdateCodeSignature: true
+  verifyUpdateCodeSignature: false
   target:
     - target: nsis
       arch:

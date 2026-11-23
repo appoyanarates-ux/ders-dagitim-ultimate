@@ -401,6 +401,15 @@ function createMainWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
+  // Program açıldığında arka planda yeni sürüm kontrolü yap (3 sn sonra, çevrimdışı uyumlu, kullanıcı onaysız indirmez)
+  mainWindow.webContents.once('did-finish-load', () => {
+    if (app.isPackaged) {
+      setTimeout(() => {
+        getUpdaterService().checkForUpdates().catch(() => {});
+      }, 3000);
+    }
+  });
+
   mainWindow.on('closed', () => {
     cancelActiveSolve();
     mainWindow = null;

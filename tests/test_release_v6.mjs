@@ -87,6 +87,21 @@ test('Aşama 6.2: UpdaterService fail-closed Ed25519 manifest kapısı, kullanı
     const unconfState = await unconfSvc.checkForUpdates();
     assert.equal(unconfState.status, 'unconfigured');
 
+    // 1b) Kod imzalama sertifikası olmadan (yalnızca githubOwner ile) güncelleme kontrolü ve onaylı indirme çalışmalı
+    const fakeNoCert = new FakeAutoUpdater();
+    const noCertSvc = new UpdaterService({
+      appVersion: '1.0.2',
+      isPackaged: true,
+      autoUpdater: fakeNoCert,
+      backupService: backupSvc,
+      securityConfig: { githubOwner: 'appoyanarates-ux', githubRepo: 'ders-dagitim-ultimate', expectedPublisherName: '', ed25519ManifestPublicKeyPem: '' }
+    });
+    const ncSt1 = await noCertSvc.checkForUpdates();
+    assert.equal(ncSt1.status, 'available');
+    const ncSt2 = await noCertSvc.downloadUpdate();
+    assert.equal(fakeNoCert.downloadCalled, true);
+    assert.equal(ncSt2.status, 'downloaded');
+
     // 2) Sahte/bozuk Ed25519 imzalı manifest indirmeyi engellemeli (downloadUpdate çağrılmamalı!)
     const fakeBad = new FakeAutoUpdater();
     const badFetch = async (url) => ({
@@ -229,7 +244,6 @@ test('Aşama 6.4: Başlangıç kontrolleri, .gitignore, POSIX WP ZIP ve boş PAT
     const builderYml = fs.readFileSync(path.join(projectRoot, 'electron-builder.yml'), 'utf8');
     assert.ok(builderYml.includes('EvrakPlus-Ders-Dagitim-Setup-${version}.exe'));
     assert.ok(builderYml.includes('deleteAppDataOnUninstall: false'));
-    assert.ok(builderYml.includes('verifyUpdateCodeSignature: true'));
     assert.ok(builderYml.includes('owner: appoyanarates-ux'));
     assert.ok(builderYml.includes('repo: ders-dagitim-ultimate'));
 
