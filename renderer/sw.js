@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'evrakplus-dd-pwa-v1.0.4';
+const CACHE_NAME = 'evrakplus-dd-pwa-v1.0.5';
 const STATIC_ASSETS = [
   './index.html',
   './app.js',

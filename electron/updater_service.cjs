@@ -183,7 +183,7 @@ class UpdaterService {
 
     this.autoUpdater.on('error', (err) => {
       const rawMsg = String((err && err.message) || err || '');
-      const isOffline = /ERR_INTERNET_DISCONNECTED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|net::/i.test(rawMsg);
+      const isOffline = /ERR_INTERNET_DISCONNECTED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ERR_CONNECTION_RESET|ERR_TUNNEL_CONNECTION_FAILED|ERR_CERT_|net::/i.test(rawMsg);
       if (isOffline) {
         this._emit({
           status: 'offline',

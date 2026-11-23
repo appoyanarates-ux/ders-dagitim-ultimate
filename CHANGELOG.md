@@ -2,6 +2,9 @@
 
 Tüm sürümler Semantik Sürümleme (`MAJOR.MINOR.PATCH`) düzenini izler.
 
+## [1.0.5] — 2026-11-23
+- MEB okul ağı (Fatih interneti) uyumluluğu: Ağ istekleri standart Node `fetch` yerine Electron `net.fetch` (Chromium ağ katmanı) üzerinden geçirildi; Windows Sertifika Deposu (MEB Sertifikası dahil) ve sistem proxy ayarları artık otomatik tanınır.
+
 ## [1.0.4] — 2026-11-23
 - Arayüzdeki teknik motor ifadeleri sadeleştirildi.
 - Dağıtım esnasında çıkan uyarılara ve yerleşemeyen bloklara (ör. "5/A: Görsel Sanatlar için öğretmen atanmamış") doğrudan ilgili şube/ders/öğretmene tek tıkla götüren hızlı düzeltme bağlantıları eklendi.

@@ -222,8 +222,14 @@ class EvrakPlusClient {
         headers,
         body: body !== null ? JSON.stringify(body) : undefined
       });
-    } catch (_netErr) {
-      const err = new Error('EvrakPlus sunucusuna bağlanılamadı. İnternet bağlantınızı kontrol edin.');
+    } catch (netErr) {
+      const detail = String((netErr && netErr.message) || '');
+      const isCert = /CERT|SSL|TLS|UNABLE_TO_VERIFY/i.test(detail);
+      const err = new Error(
+        isCert
+          ? 'Güvenli bağlantı sertifikası doğrulanamadı. MEB okul ağındaysanız Windows MEB Sertifikasının kurulu olduğundan emin olun.'
+          : 'EvrakPlus sunucusuna bağlanılamadı. İnternet bağlantınızı veya MEB okul ağı filtresini kontrol edin.'
+      );
       err.code = 'NETWORK_OFFLINE';
       throw err;
     }

@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, dialog, ipcMain, safeStorage, session, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, net, safeStorage, session, shell } = require('electron');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -33,6 +33,12 @@ function getBackupService() {
   return backupService;
 }
 
+function chromiumFetch(url, opts) {
+  // Electron net.fetch, Chromium ag katmanini kullanir:
+  // Windows Sertifika Deposu (MEB Sertifikasi dahil) ve sistem proxy ayarlarini otomatik tanir.
+  return net.fetch(url, opts);
+}
+
 function getUpdaterService() {
   if (!updaterService) {
     updaterService = new UpdaterService({
@@ -40,6 +46,7 @@ function getUpdaterService() {
       isPackaged: app.isPackaged,
       autoUpdater: electronAutoUpdater,
       backupService: getBackupService(),
+      fetchImpl: chromiumFetch,
       onStatus: (st) => {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('updater:status', st);
@@ -55,6 +62,7 @@ function getEvrakPlusClient() {
     evrakplusClient = new EvrakPlusClient({
       storageDir: app.getPath('userData'),
       safeStorage,
+      fetchImpl: chromiumFetch,
       allowLocalHttp: !app.isPackaged && Boolean(process.env.EVRAKPLUS_ALLOW_LOCAL_HTTP)
     });
   }
