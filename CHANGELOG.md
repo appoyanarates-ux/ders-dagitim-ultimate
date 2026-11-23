@@ -2,6 +2,12 @@
 
 Tüm sürümler Semantik Sürümleme (`MAJOR.MINOR.PATCH`) düzenini izler.
 
+## [1.0.3] — 2026-11-23
+- Öğretmen varsayılan saat sınırları Min 1 / Maks 30, Günlük Maks okulun günlük ders saatine dinamik bağlandı.
+- Öğretmenlere ekstra okutabilecekleri dersler ve Görev/Unvan (Öğretmen / Okul Müdürü / Müdür Yardımcısı) eklendi; Menü 4'e "Ek Okutabileceği Derslere Göre Dağıt" eklendi.
+- Okul Nöbeti modülü eklendi (nöbet yerleri, en yoğun / en az ders gününe dağıtım, haftalık & aylık rotasyonlu çizelge, PDF/Excel çıktısı; Okul Müdürü ve Müdür Yardımcıları otomatik muaf).
+- "Programı Kontrol Et" butonu tüm hataları tam adresiyle (Menü / Şube / Öğretmen / Gün / Ders Saati) ve "Adrese Git" kısayoluyla raporlayacak şekilde geliştirildi.
+
 ## [1.0.2] — 2026-11-23
 - Kod imzalama sertifikası gerektirmeden GitHub Releases üzerinden açılışta otomatik güncelleme kontrolü ve SHA-512 bütünlük doğrulamalı kullanıcı onaylı güncelleme akışı etkinleştirildi.
 

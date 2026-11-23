@@ -1992,21 +1992,36 @@ function renderMenu3() {
           </select>
         </div>
         <div>
-          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Min / Maks Saat</label>
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Min / Maks Saat (1–30)</label>
           <div class="flex items-center gap-1">
-            <input id="editTMin" type="number" min="0" max="40" value="${activeT.minHours}" class="w-1/2 px-1.5 py-1.5 rounded-lg border border-slate-300 text-xs text-center font-bold" />
-            <input id="editTMax" type="number" min="1" max="45" value="${activeT.maxHours}" class="w-1/2 px-1.5 py-1.5 rounded-lg border border-slate-300 text-xs text-center font-bold" />
+            <input id="editTMin" type="number" min="1" max="40" value="${activeT.minHours ?? 1}" class="w-1/2 px-1.5 py-1.5 rounded-lg border border-slate-300 text-xs text-center font-bold" />
+            <input id="editTMax" type="number" min="1" max="45" value="${activeT.maxHours ?? 30}" class="w-1/2 px-1.5 py-1.5 rounded-lg border border-slate-300 text-xs text-center font-bold" />
           </div>
         </div>
         <div>
-          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Günlük Maks / Nöbet</label>
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Günlük Maks (${state.grid.periodsPerDay}) / Nöbet</label>
           <div class="flex items-center gap-1">
-            <input id="editTDaily" type="number" min="1" max="10" value="${activeT.maxDaily}" title="Günlük Maksimum Ders" class="w-14 px-1.5 py-1.5 rounded-lg border border-slate-300 text-xs text-center font-bold" />
-            <select id="editTDuty" title="Nöbet Günü" class="flex-1 min-w-0 px-1.5 py-1.5 rounded-lg border border-slate-300 text-[11px] bg-white">
-              <option value="-1" ${activeT.dutyDay < 0 ? 'selected' : ''}>Nöbet Yok</option>
+            <input id="editTDaily" type="number" min="1" max="12" value="${activeT.maxDaily || state.grid.periodsPerDay || 7}" title="Günlük Maksimum Ders" class="w-14 px-1.5 py-1.5 rounded-lg border border-slate-300 text-xs text-center font-bold" />
+            <select id="editTDuty" title="Nöbet Günü" ${(activeT.role === 'mudur' || activeT.role === 'mudur_yardimcisi') ? 'disabled' : ''} class="flex-1 min-w-0 px-1.5 py-1.5 rounded-lg border border-slate-300 text-[11px] bg-white disabled:bg-slate-100 disabled:text-slate-400">
+              <option value="-1" ${(activeT.dutyDay < 0 || activeT.role === 'mudur' || activeT.role === 'mudur_yardimcisi') ? 'selected' : ''}>${(activeT.role === 'mudur' || activeT.role === 'mudur_yardimcisi') ? 'İdareci (Muaf)' : 'Nöbet Yok'}</option>
               ${gridStats.activeDayIndices.map((d) => `<option value="${d}" ${activeT.dutyDay === d ? 'selected' : ''}>${DAY_SHORT[d]}</option>`).join('')}
             </select>
           </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Görev / Unvan</label>
+          <select id="editTRole" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white font-semibold">
+            <option value="ogretmen" ${(!activeT.role || activeT.role === 'ogretmen') ? 'selected' : ''}>Öğretmen (Nöbet Tutar)</option>
+            <option value="mudur" ${activeT.role === 'mudur' ? 'selected' : ''}>Okul Müdürü (Okul Nöbeti Tutmaz)</option>
+            <option value="mudur_yardimcisi" ${activeT.role === 'mudur_yardimcisi' ? 'selected' : ''}>Müdür Yardımcısı (Okul Nöbeti Tutmaz)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Ekstra Okutabileceği Dersler / Branşlar <span class="text-slate-400 font-normal">(Virgülle ayırın)</span></label>
+          <input id="editTExtraSubjects" type="text" value="${escapeHtml(Array.isArray(activeT.extraSubjects) ? activeT.extraSubjects.join(', ') : '')}" placeholder="Örn: Bilişim, Seçmeli İngilizce, Rehberlik" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs focus:outline-none" />
         </div>
       </div>
 
@@ -2058,10 +2073,22 @@ function renderMenu3() {
 
   document.getElementById('editTName').addEventListener('change', (e) => { activeT.name = e.target.value.trim() || activeT.branch; activeT.shortCode = makeTeacherShortCode(activeT.name); saveState(); renderMenu3(); });
   document.getElementById('editTBranch').addEventListener('change', (e) => { activeT.branch = e.target.value; saveState(); renderMenu3(); });
-  document.getElementById('editTMin').addEventListener('change', (e) => { activeT.minHours = Math.max(0, Math.min(40, Number(e.target.value) || 0)); saveState(); renderMenu3(); });
+  document.getElementById('editTMin').addEventListener('change', (e) => { activeT.minHours = Math.max(1, Math.min(40, Number(e.target.value) || 1)); saveState(); renderMenu3(); });
   document.getElementById('editTMax').addEventListener('change', (e) => { activeT.maxHours = Math.max(1, Math.min(45, Number(e.target.value) || 30)); saveState(); renderMenu3(); });
-  document.getElementById('editTDaily').addEventListener('change', (e) => { activeT.maxDaily = Math.max(1, Math.min(10, Number(e.target.value) || 6)); saveState(); });
+  document.getElementById('editTDaily').addEventListener('change', (e) => { activeT.maxDaily = Math.max(1, Math.min(12, Number(e.target.value) || state.grid.periodsPerDay || 7)); saveState(); });
   document.getElementById('editTDuty').addEventListener('change', (e) => { activeT.dutyDay = Number(e.target.value); saveState(); renderMenu3(); });
+  document.getElementById('editTRole').addEventListener('change', (e) => {
+    activeT.role = e.target.value;
+    if (activeT.role === 'mudur' || activeT.role === 'mudur_yardimcisi') {
+      activeT.dutyDay = -1;
+      activeT.dutyLocation = '';
+    }
+    saveState(); renderMenu3();
+  });
+  document.getElementById('editTExtraSubjects').addEventListener('change', (e) => {
+    activeT.extraSubjects = String(e.target.value || '').split(',').map((s) => s.trim()).filter(Boolean);
+    saveState(); renderMenu3();
+  });
   document.getElementById('editTMaxConsec').addEventListener('change', (e) => { activeT.maxConsecutive = Math.max(0, Math.min(10, Number(e.target.value) || 0)); saveState(); });
   document.getElementById('editTMaxGaps').addEventListener('change', (e) => { activeT.maxDailyGaps = Math.max(0, Math.min(6, Number(e.target.value) || 0)); saveState(); });
   document.getElementById('editTMaxDays').addEventListener('change', (e) => { activeT.maxWorkingDays = Math.max(0, Math.min(6, Number(e.target.value) || 0)); saveState(); });
@@ -2163,9 +2190,11 @@ function openTeacherModal() {
   document.getElementById('tmCustomBranchWrap').classList.add('hidden');
   document.getElementById('tmCustomBranch').value = '';
   document.getElementById('tmName').value = '';
-  document.getElementById('tmMinHours').value = '15';
+  document.getElementById('tmRole').value = 'ogretmen';
+  document.getElementById('tmExtraSubjects').value = '';
+  document.getElementById('tmMinHours').value = '1';
   document.getElementById('tmMaxHours').value = '30';
-  document.getElementById('tmMaxDaily').value = '6';
+  document.getElementById('tmMaxDaily').value = String(state.grid.periodsPerDay || 7);
   document.getElementById('tmDutyDay').value = '-1';
   modalDraftAvail = createDefaultAvailability();
   renderModalAvailGrid();
@@ -2544,13 +2573,17 @@ function openSwapModal(plA, plB) {
   if (window.lucide) window.lucide.createIcons();
 }
 
-async function runScheduleAudit() {
-  const panel = document.getElementById('m5AuditPanel');
+async function runScheduleAudit(targetPanelId = null) {
+  const panelId = targetPanelId || (state.activeView === 'menu6' ? 'm6AuditPanel' : 'm5AuditPanel');
+  const panel = document.getElementById(panelId) || document.getElementById('m5AuditPanel');
   if (!panel) return;
   panel.classList.remove('hidden');
-  panel.innerHTML = `<div class="text-xs text-slate-500">Program kontrol ediliyor...</div>`;
+  panel.innerHTML = `<div class="text-xs text-slate-500">Program tüm menülerde tam adresli olarak kontrol ediliyor...</div>`;
 
-  const localIssues = window.DersEditorLogic.auditScheduleLocal(state, getEditorHelpers());
+  const fullAudit = window.DersDutyModule
+    ? window.DersDutyModule.runFullAddressAudit(state, getEditorHelpers(), window.DersEditorLogic)
+    : { isClean: true, errors: [], warnings: [] };
+
   const api = window.dersDagitimAPI;
   let pyErrors = [];
   if (api && typeof api.validateTimetable === 'function' && state.solution && Array.isArray(state.solution.placements) && state.solution.placements.length) {
@@ -2559,60 +2592,75 @@ async function runScheduleAudit() {
       if (val && Array.isArray(val.result_errors)) {
         pyErrors = val.result_errors;
       }
-    } catch (_e) {
-      // Yerel kontrol sonuçları gösterilir
-    }
+    } catch (_e) {}
   }
 
-  const allErrors = localIssues.filter((x) => x.severity === 'error');
+  const allErrors = [...(fullAudit.errors || [])];
   const seenMsgs = new Set(allErrors.map((e) => e.message));
   pyErrors.forEach((pe) => {
     const msg = pe.message || String(pe);
     if (!seenMsgs.has(msg)) {
-      allErrors.push({ severity: 'error', category: 'Doğrulama Hatası', message: msg });
+      allErrors.push({
+        severity: 'error',
+        category: 'OR-Tools Bağımsız Doğrulama Hatası',
+        address: 'Menü 5 / Menü 6 → Çözüm Doğrulama',
+        message: msg,
+        nav: { view: 'menu6', tab: 'report' }
+      });
       seenMsgs.add(msg);
     }
   });
-  const infos = localIssues.filter((x) => x.severity === 'info');
+  const warnings = fullAudit.warnings || [];
 
   if (allErrors.length === 0) {
     panel.innerHTML = `
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center gap-2 text-emerald-700 font-bold text-sm"><i data-lucide="check-circle-2" class="w-5 h-5"></i> Program Kontrolü Başarılı — Hata Bulunmadı</div>
-        <button type="button" id="btnCloseAuditPanel" class="text-xs text-slate-400 hover:text-slate-700">Kapat</button>
+        <button type="button" class="btn-close-audit text-xs text-slate-400 hover:text-slate-700">Kapat</button>
       </div>
-      ${infos.length ? `<div class="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600 space-y-1"><div class="font-semibold text-slate-800">Bilgilendirme (${infos.length})</div>${infos.slice(0, 8).map((i) => `<div>• ${escapeHtml(i.message)}</div>`).join('')}</div>` : ''}
+      ${warnings.length ? `<div class="rounded-xl bg-amber-50/70 border border-amber-200 p-3 text-xs text-amber-900 space-y-1.5"><div class="font-bold">Uyarılar (${warnings.length})</div>${warnings.slice(0, 12).map((w) => `<div><span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-amber-100 border border-amber-300 mr-1.5">${escapeHtml(w.address)}</span> ${escapeHtml(w.message)}</div>`).join('')}</div>` : ''}
     `;
   } else {
     panel.innerHTML = `
       <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-        <div class="flex items-center gap-2 text-rose-700 font-bold text-sm"><i data-lucide="alert-triangle" class="w-5 h-5"></i> ${allErrors.length} Sorun Tespit Edildi</div>
+        <div class="flex items-center gap-2 text-rose-700 font-bold text-sm"><i data-lucide="alert-triangle" class="w-5 h-5"></i> ${allErrors.length} Hata Tespit Edildi (Tam Adres Listesi)</div>
         <div class="flex items-center gap-2">
           <button type="button" id="btnAuditFixOrTools" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition"><i data-lucide="wrench" class="w-3.5 h-3.5"></i> OR-Tools ile Düzelt</button>
-          <button type="button" id="btnCloseAuditPanel" class="text-xs text-slate-400 hover:text-slate-700">Kapat</button>
+          <button type="button" class="btn-close-audit text-xs text-slate-400 hover:text-slate-700">Kapat</button>
         </div>
       </div>
-      <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
-        ${allErrors.slice(0, 20).map((err, idx) => `
-          <div class="p-3 rounded-xl border border-rose-200 bg-rose-50/50 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div><span class="font-bold text-rose-800">${escapeHtml(err.category)}:</span> <span class="text-slate-800">${escapeHtml(err.message)}</span></div>
-            ${(err.class_id || err.teacher_id) ? `<button type="button" data-audit-go="${idx}" class="audit-go-btn px-2.5 py-1 rounded-lg bg-white border border-rose-300 hover:bg-rose-100 text-rose-800 text-[11px] font-semibold shrink-0">İlgili Derse Git</button>` : ''}
+      <div class="space-y-2 max-h-80 overflow-y-auto pr-1">
+        ${allErrors.slice(0, 40).map((err, idx) => `
+          <div class="p-3 rounded-xl border border-rose-200 bg-rose-50/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="space-y-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="font-bold text-rose-800">${idx + 1}. ${escapeHtml(err.category)}</span>
+                <span class="font-mono text-[10px] px-2 py-0.5 rounded-md bg-white border border-rose-300 text-rose-900 font-semibold">${escapeHtml(err.address || 'Genel')}</span>
+              </div>
+              <div class="text-slate-800">${escapeHtml(err.message)}</div>
+            </div>
+            ${err.nav ? `<button type="button" data-audit-go="${idx}" class="audit-go-btn px-2.5 py-1.5 rounded-lg bg-white border border-rose-300 hover:bg-rose-100 text-rose-800 text-[11px] font-bold shrink-0">Adrese Git →</button>` : ''}
           </div>
         `).join('')}
       </div>
+      ${warnings.length ? `<div class="rounded-xl bg-amber-50/70 border border-amber-200 p-2.5 text-[11px] text-amber-900 space-y-1"><div class="font-bold">Ek Uyarılar (${warnings.length})</div>${warnings.slice(0, 8).map((w) => `<div><strong>${escapeHtml(w.address)}:</strong> ${escapeHtml(w.message)}</div>`).join('')}</div>` : ''}
     `;
-    const fixBtn = document.getElementById('btnAuditFixOrTools');
+    const fixBtn = panel.querySelector('#btnAuditFixOrTools');
     if (fixBtn) fixBtn.addEventListener('click', () => startOrToolsSolver(true, false, { mode: 'repair_min_changes', preview: true }));
     panel.querySelectorAll('.audit-go-btn').forEach((btn) => btn.addEventListener('click', () => {
       const item = allErrors[Number(btn.dataset.auditGo)];
-      if (!item) return;
-      state.activeView = 'menu6';
-      if (item.class_id) { state.m6Tab = 'class'; state.m6EntityId = item.class_id; }
-      else if (item.teacher_id) { state.m6Tab = 'teacher'; state.m6EntityId = item.teacher_id; }
+      if (!item || !item.nav) return;
+      state.activeView = item.nav.view || 'menu6';
+      if (item.nav.view === 'menu3' && item.nav.teacherId) state.selectedTeacherId = item.nav.teacherId;
+      if (item.nav.view === 'menu4' && item.nav.classId) state.m4ClassFilter = item.nav.classId;
+      if (item.nav.view === 'menu6') {
+        if (item.nav.tab) state.m6Tab = item.nav.tab;
+        if (item.nav.entityId) state.m6EntityId = item.nav.entityId;
+      }
       saveState(); renderAll();
     }));
   }
-  const closeBtn = document.getElementById('btnCloseAuditPanel');
+  const closeBtn = panel.querySelector('.btn-close-audit');
   if (closeBtn) closeBtn.addEventListener('click', () => panel.classList.add('hidden'));
   if (window.lucide) window.lucide.createIcons();
 }
@@ -3496,6 +3544,207 @@ function renderTeacherCarsaf(placements) {
   `;
 }
 
+function renderSchoolDutyTab(contentEl) {
+  const DM = window.DersDutyModule;
+  const cfg = DM.ensureDutyConfig(state);
+  const teachers = getCurrentTeachers();
+  const gridStats = getSlotStats();
+  const activeDays = gridStats.activeDayIndices;
+  const tMap = Object.fromEntries(teachers.map((t) => [t.id, t]));
+  const eligible = teachers.filter((t) => !DM.isDutyExempt(t));
+  const admins = teachers.filter((t) => DM.isAdministratorTeacher(t));
+  const monthly = DM.buildMonthlyDutySchedule(state, teachers, activeDays, cfg.year, cfg.month, Boolean(cfg.rotateWeekly));
+
+  const weeklyRowsHtml = cfg.locations.map((loc) => `
+    <tr>
+      <td class="p-2 border border-slate-200 bg-slate-50 font-bold text-slate-800 text-xs">${escapeHtml(loc)}</td>
+      ${activeDays.map((d) => {
+        const ids = (cfg.weeklyAssignments[d] && cfg.weeklyAssignments[d][loc]) || [];
+        const names = ids.map((id) => tMap[id]).filter((t) => t && !DM.isDutyExempt(t));
+        return `<td class="p-2 border border-slate-200 text-xs align-top">
+          ${names.length
+            ? names.map((t) => `<div class="inline-flex items-center gap-1 px-2 py-0.5 m-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-900 font-semibold text-[11px]">${escapeHtml(t.name)}</div>`).join('')
+            : '<span class="text-slate-300 text-[11px]">—</span>'}
+        </td>`;
+      }).join('')}
+    </tr>
+  `).join('');
+
+  contentEl.innerHTML = `
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">Okul Nöbeti Yönetimi (Haftalık & Aylık Çizelge)</h3>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Nöbet tutacak öğretmen: <strong>${eligible.length}</strong> · Muaf idareci (Okul Müdürü / Müdür Yrd.): <strong>${admins.length}</strong>
+            <span class="text-amber-700 font-semibold">(Okul müdürleri ve müdür yardımcıları okul nöbeti tutmaz.)</span>
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="btnDutyAutoBusiest" type="button" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition">
+            En Yoğun Ders Gününe Nöbet Dağıt
+          </button>
+          <button id="btnDutyAutoLightest" type="button" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition">
+            En Az Ders Gününe Nöbet Dağıt
+          </button>
+        </div>
+      </div>
+
+      <!-- Nöbet Yerleri Yönetimi -->
+      <div class="rounded-xl bg-slate-50 border border-slate-200 p-3.5 space-y-2.5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span class="text-xs font-bold text-slate-800">Nöbet Yerleri (${cfg.locations.length})</span>
+          <div class="flex items-center gap-1.5">
+            <input id="inpNewDutyLoc" type="text" placeholder="Yeni nöbet yeri (Örn: 3. Kat, Spor Alanı)" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white w-56 focus:outline-none" />
+            <button id="btnAddDutyLoc" type="button" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold">Ekle</button>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          ${cfg.locations.map((loc, idx) => `
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-300 text-xs font-semibold text-slate-700">
+              ${escapeHtml(loc)}
+              ${cfg.locations.length > 1 ? `<button type="button" data-del-loc="${idx}" class="btn-del-duty-loc text-rose-500 hover:text-rose-700 font-bold" title="Sil">×</button>` : ''}
+            </span>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Haftalık Nöbet Tablosu -->
+      <div>
+        <div class="text-xs font-bold text-slate-800 mb-2">Haftalık Nöbet Çizelgesi</div>
+        <div class="overflow-x-auto">
+          <table class="w-full border-collapse min-w-[600px]">
+            <thead>
+              <tr>
+                <th class="p-2 border border-slate-200 bg-indigo-50 text-left text-xs font-bold text-slate-800 w-36">Nöbet Yeri</th>
+                ${activeDays.map((d) => `<th class="p-2 border border-slate-200 bg-indigo-50 text-center text-xs font-bold text-slate-800">${DAY_NAMES[d]}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>${weeklyRowsHtml}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Aylık Nöbet Hazırlama -->
+      <div class="pt-3 border-t border-slate-200 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sm font-bold text-slate-900">Aylık Nöbet Çizelgesi</span>
+            <select id="selDutyMonth" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold bg-white">
+              ${DM.MONTH_NAMES.map((mn, i) => `<option value="${i + 1}" ${cfg.month === i + 1 ? 'selected' : ''}>${mn}</option>`).join('')}
+            </select>
+            <input id="inpDutyYear" type="number" min="2024" max="2035" value="${cfg.year}" class="w-20 px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-center" />
+            <label class="inline-flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer ml-1">
+              <input id="chkDutyRotate" type="checkbox" ${cfg.rotateWeekly ? 'checked' : ''} class="rounded text-indigo-600" />
+              <span>Haftalık Nöbet Yeri Rotasyonu</span>
+            </label>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btnDutyExportPdf" type="button" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition">Aylık Nöbet PDF / Yazdır</button>
+            <button id="btnDutyExportXlsx" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition">Aylık Nöbet Excel (.xlsx)</button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto max-h-96 overflow-y-auto border border-slate-200 rounded-xl">
+          <table class="w-full border-collapse text-xs">
+            <thead class="sticky top-0 bg-indigo-50">
+              <tr>
+                <th class="p-2 border border-slate-200 text-center font-bold w-24">Tarih</th>
+                <th class="p-2 border border-slate-200 text-left font-bold w-28">Gün</th>
+                ${monthly.locations.map((l) => `<th class="p-2 border border-slate-200 text-center font-bold">${escapeHtml(l)}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${monthly.rows.map((r) => `
+                <tr class="hover:bg-slate-50">
+                  <td class="p-1.5 border border-slate-200 text-center font-mono">${escapeHtml(r.dateStr)}</td>
+                  <td class="p-1.5 border border-slate-200 font-semibold bg-slate-50">${escapeHtml(r.dayName)}</td>
+                  ${monthly.locations.map((l) => `<td class="p-1.5 border border-slate-200 text-center">${escapeHtml((r.byLocation[l] || []).join(', ') || '—')}</td>`).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('btnDutyAutoBusiest').addEventListener('click', () => {
+    try {
+      const r = DM.autoAssignSchoolDuties(state, teachers, activeDays, 'busiest_day');
+      saveState(); renderMenu6();
+      showToast(`${r.assignedCount} öğretmene en yoğun ders gününe göre nöbet dağıtıldı (${r.skippedAdminsCount} idareci muaf).`);
+    } catch (err) { showToast(err.message); }
+  });
+  document.getElementById('btnDutyAutoLightest').addEventListener('click', () => {
+    try {
+      const r = DM.autoAssignSchoolDuties(state, teachers, activeDays, 'lightest_day');
+      saveState(); renderMenu6();
+      showToast(`${r.assignedCount} öğretmene en az ders gününe göre nöbet dağıtıldı (${r.skippedAdminsCount} idareci muaf).`);
+    } catch (err) { showToast(err.message); }
+  });
+  document.getElementById('btnAddDutyLoc').addEventListener('click', () => {
+    const inp = document.getElementById('inpNewDutyLoc');
+    const val = (inp && inp.value || '').trim();
+    if (!val) return;
+    if (!cfg.locations.includes(val)) cfg.locations.push(val);
+    saveState(); renderMenu6();
+  });
+  contentEl.querySelectorAll('.btn-del-duty-loc').forEach((btn) => btn.addEventListener('click', () => {
+    const idx = Number(btn.dataset.delLoc);
+    if (cfg.locations.length > 1 && idx >= 0) {
+      cfg.locations.splice(idx, 1);
+      saveState(); renderMenu6();
+    }
+  }));
+  document.getElementById('selDutyMonth').addEventListener('change', (e) => { cfg.month = Number(e.target.value); saveState(); renderMenu6(); });
+  document.getElementById('inpDutyYear').addEventListener('change', (e) => { cfg.year = Number(e.target.value) || new Date().getFullYear(); saveState(); renderMenu6(); });
+  document.getElementById('chkDutyRotate').addEventListener('change', (e) => { cfg.rotateWeekly = Boolean(e.target.checked); saveState(); renderMenu6(); });
+
+  document.getElementById('btnDutyExportPdf').addEventListener('click', async () => {
+    const html = DM.buildMonthlyDutyPrintHtml(state, monthly);
+    const api = window.dersDagitimAPI;
+    const filename = `aylik_nobet_${monthly.year}_${String(monthly.month).padStart(2, '0')}.pdf`;
+    if (api && typeof api.exportPdf === 'function') {
+      try {
+        const res = await api.exportPdf({ html, defaultFilename: filename, pdfOptions: { pageSize: 'A4', orientation: 'landscape' } });
+        if (!res.canceled) showToast(`Aylık nöbet PDF kaydedildi: ${filename}`);
+      } catch (err) { showToast(err.message || 'PDF oluşturulamadı.'); }
+    } else {
+      const w = window.open('', '_blank');
+      if (w) { w.document.write(html); w.document.close(); w.print(); }
+    }
+  });
+
+  document.getElementById('btnDutyExportXlsx').addEventListener('click', async () => {
+    if (typeof window.XLSX === 'undefined') { showToast('Excel modülü yüklenemedi.'); return; }
+    const aoa = [
+      [`${(state.school && state.school.name) || 'OKUL'} — ${monthly.monthName.toUpperCase()} ${monthly.year} AYLIK NÖBET ÇİZELGESİ`],
+      ['Tarih', 'Gün', ...monthly.locations],
+      ...monthly.rows.map((r) => [r.dateStr, r.dayName, ...monthly.locations.map((l) => (r.byLocation[l] || []).join(', '))])
+    ];
+    const ws = window.XLSX.utils.aoa_to_sheet(aoa);
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, 'Aylik Nobet');
+    const filename = `aylik_nobet_${monthly.year}_${String(monthly.month).padStart(2, '0')}.xlsx`;
+    const api = window.dersDagitimAPI;
+    if (api && typeof api.saveBinaryFile === 'function') {
+      try {
+        const b64 = window.XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+        const res = await api.saveBinaryFile({
+          title: 'Aylık Nöbet Excel Kaydet',
+          defaultFilename: filename,
+          filters: [{ name: 'Excel (.xlsx)', extensions: ['xlsx'] }],
+          base64Data: b64
+        });
+        if (!res.canceled) showToast(`Aylık nöbet Excel kaydedildi: ${filename}`);
+      } catch (err) { showToast(err.message || 'Excel kaydedilemedi.'); }
+    } else {
+      window.XLSX.writeFile(wb, filename);
+    }
+  });
+}
+
 function renderMenu6() {
   ensureState(state);
   document.querySelectorAll('.m6-tab-btn').forEach((b) => {
@@ -3507,6 +3756,13 @@ function renderMenu6() {
   const pickerWrap = document.getElementById('m6EntityPickerWrap');
   const selEl = document.getElementById('m6EntitySelect');
   const moveHint = document.getElementById('m6MoveHint');
+
+  if (state.m6Tab === 'duty' && window.DersDutyModule) {
+    pickerWrap.classList.add('hidden');
+    renderSchoolDutyTab(contentEl);
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
 
   if (!state.solution || !Array.isArray(state.solution.placements) || state.solution.placements.length === 0) {
     pickerWrap.classList.add('hidden');
@@ -4660,13 +4916,21 @@ function bindEvents() {
       if (!branch) { showToast('Özel branş adını yazın'); return; }
     }
     const finalName = document.getElementById('tmName').value.trim() || generateFallbackTeacherName(branch);
+    const roleVal = document.getElementById('tmRole') ? document.getElementById('tmRole').value : 'ogretmen';
+    const extraRaw = document.getElementById('tmExtraSubjects') ? document.getElementById('tmExtraSubjects').value : '';
+    const extraSubjects = String(extraRaw || '').split(',').map((s) => s.trim()).filter(Boolean);
+    const isAdmin = roleVal === 'mudur' || roleVal === 'mudur_yardimcisi';
+    const defaultDaily = state.grid.periodsPerDay || 7;
     const newT = {
       id: 'tch_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
       name: finalName, shortCode: makeTeacherShortCode(finalName), branch,
-      minHours: Math.max(0, Math.min(40, Number(document.getElementById('tmMinHours').value) || 0)),
+      role: roleVal,
+      extraSubjects,
+      minHours: Math.max(1, Math.min(40, Number(document.getElementById('tmMinHours').value) || 1)),
       maxHours: Math.max(1, Math.min(45, Number(document.getElementById('tmMaxHours').value) || 30)),
-      maxDaily: Math.max(1, Math.min(10, Number(document.getElementById('tmMaxDaily').value) || 6)),
-      dutyDay: Number(document.getElementById('tmDutyDay').value),
+      maxDaily: Math.max(1, Math.min(12, Number(document.getElementById('tmMaxDaily').value) || defaultDaily)),
+      dutyDay: isAdmin ? -1 : Number(document.getElementById('tmDutyDay').value),
+      dutyLocation: '',
       availability: JSON.parse(JSON.stringify(modalDraftAvail))
     };
     getCurrentTeachers().push(newT);
@@ -4684,7 +4948,7 @@ function bindEvents() {
     Object.entries(bulkTeacherCounts).forEach(([branch, count]) => {
       for (let i = 0; i < count; i++) {
         const name = generateFallbackTeacherName(branch);
-        const newT = { id: 'tch_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '_' + i, name, shortCode: makeTeacherShortCode(name), branch, minHours: 15, maxHours: 30, maxDaily: 6, dutyDay: -1, availability: createDefaultAvailability() };
+        const newT = { id: 'tch_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '_' + i, name, shortCode: makeTeacherShortCode(name), branch, role: 'ogretmen', extraSubjects: [], minHours: 1, maxHours: 30, maxDaily: state.grid.periodsPerDay || 7, dutyDay: -1, dutyLocation: '', availability: createDefaultAvailability() };
         list.push(newT); if (!state.selectedTeacherId) state.selectedTeacherId = newT.id; added++;
       }
     });
@@ -4709,6 +4973,29 @@ function bindEvents() {
     }));
     saveState(); renderMenu4(); showToast(assigned > 0 ? `${assigned} ders branşlarına göre dağıtıldı` : 'Eşleşen boş ders bulunamadı');
   });
+  const btnExtraMatch = document.getElementById('btnM4AutoMatchExtra');
+  if (btnExtraMatch) {
+    btnExtraMatch.addEventListener('click', () => {
+      const teachers = getCurrentTeachers(), classes = getCurrentClasses();
+      if (!teachers.length || !classes.length) { showToast('Önce şube, ders ve öğretmen oluşturun'); return; }
+      const loadMap = computeTeacherLoads(); let assigned = 0;
+      classes.forEach((cls) => (cls.courses || []).forEach((c) => {
+        if (!c.teacherId) {
+          const candidates = teachers
+            .filter((t) => window.DersDutyModule && window.DersDutyModule.doesTeacherExtraMatchCourse(t, c.name, c.code))
+            .sort((a, b) => loadMap[a.id].totalHours - loadMap[b.id].totalHours);
+          const pick = candidates.find((t) => loadMap[t.id].totalHours + Number(c.hours || 0) <= Number(t.maxHours || 30)) || candidates[0];
+          if (pick) {
+            c.teacherId = pick.id;
+            loadMap[pick.id].totalHours += Number(c.hours || 0);
+            assigned++;
+          }
+        }
+      }));
+      saveState(); renderMenu4();
+      showToast(assigned > 0 ? `${assigned} boş ders öğretmenlerin ekstra okutabileceği derslere göre dağıtıldı` : 'Ekstra ders tanımlı uygun boş ders bulunamadı');
+    });
+  }
   document.getElementById('btnM4ClearAssign').addEventListener('click', () => {
     getCurrentClasses().forEach((cls) => (cls.courses || []).forEach((c) => { c.teacherId = null; c.teacherId2 = null; c.assignedRoomId = null; }));
     saveState(); renderMenu4(); showToast('Tüm ders atamaları temizlendi');
@@ -4739,7 +5026,9 @@ function bindEvents() {
     }
     startOrToolsSolver(true, false, { mode: 'repair_min_changes', preview: true });
   });
-  document.getElementById('btnM5AuditSchedule').addEventListener('click', runScheduleAudit);
+  document.getElementById('btnM5AuditSchedule').addEventListener('click', () => runScheduleAudit('m5AuditPanel'));
+  const btnM6Audit = document.getElementById('btnM6AuditSchedule');
+  if (btnM6Audit) btnM6Audit.addEventListener('click', () => runScheduleAudit('m6AuditPanel'));
   document.querySelectorAll('.m5-tpl-btn').forEach((btn) => btn.addEventListener('click', () => { state.m5TplTab = btn.dataset.m5Tpl; state.m5EntityId = ''; saveState(); renderMenu5Templates(); }));
 
   const cam = document.getElementById('cellActionModal');

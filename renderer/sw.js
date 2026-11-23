@@ -1,11 +1,12 @@
 'use strict';
 
-const CACHE_NAME = 'evrakplus-dd-pwa-v1.0.2';
+const CACHE_NAME = 'evrakplus-dd-pwa-v1.0.3';
 const STATIC_ASSETS = [
   './index.html',
   './app.js',
   './editor_logic.js',
   './export_engine.js',
+  './duty_module.js',
   './evrakplus_ui.js',
   './system_ui.js',
   './manifest.webmanifest',

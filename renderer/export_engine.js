@@ -961,7 +961,13 @@
     const schoolTitle = formatSchoolDirectorateTitle((state.school && state.school.name) || 'OKUL DERS DAĞITIM PROGRAMI');
     const principal = (es.principalName || '').trim();
     const dateStr = formatDateSlashTr(new Date());
-    const dutyText = teacher.dutyDay || '-';
+    const isAdmin = teacher.role === 'mudur' || teacher.role === 'mudur_yardimcisi';
+    let dutyText = '-';
+    if (!isAdmin && typeof teacher.dutyDay === 'number' && teacher.dutyDay >= 0 && DAY_NAMES[teacher.dutyDay]) {
+      dutyText = DAY_NAMES[teacher.dutyDay].toLocaleUpperCase('tr-TR') + (teacher.dutyLocation ? ` / ${teacher.dutyLocation}` : '');
+    } else if (!isAdmin && typeof teacher.dutyDay === 'string' && teacher.dutyDay.trim() && teacher.dutyDay !== '-1') {
+      dutyText = teacher.dutyDay.trim();
+    }
     const guidanceClass = teacher.guidanceClass || '-';
     const clubText = teacher.socialClub || '-';
     const logoHtml = (es.showLogo && es.logoDataUrl)
