@@ -2,6 +2,9 @@
 
 Tüm sürümler Semantik Sürümleme (`MAJOR.MINOR.PATCH`) düzenini izler.
 
+## [1.0.1] — 2026-11-23
+- iyileştirmeler (Resmi MEB ders programı çıktı şablonları: öğretmen programı, sınıf programı, öğretmen çarşaf ve sınıf çarşaf tasarımları; blok ders yatay `colspan` birleştirme, `Ders Listesi` alt tablosu ve imza düzeni).
+
 ## [1.0.0] — 2026-11-23 (İlk Kararlı Adayı · Aşama 1–6)
 ### Eklenenler
 - **Windows Masaüstü Paketi (NSIS x64):** `EvrakPlus-Ders-Dagitim-Setup-1.0.0.exe` (özel simge, Türkçe kurulum/kaldırma akışı, yönetici yetkisi gerektirmeyen kurulum, kaldırırken kullanıcı verilerini koruma uyarısı).

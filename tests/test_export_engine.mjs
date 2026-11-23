@@ -126,6 +126,19 @@ test('Asama 4: Tek sube & tek ogretmen cikti sablonlari, ikili ogretim saatleri 
   const tchHtml = ExportEngine.buildTeacherTimetablePageHtml(state, state.teachers[0], helpers, false, 1, 1);
   assert.ok(tchHtml.includes('Şükran Çelik Öğretmen'));
   assert.ok(tchHtml.includes('Haftalık Boş Pencere:'));
+  assert.ok(tchHtml.includes('Ders Listesi:'));
+  assert.ok(tchHtml.includes('Aslını Aldım'));
+  assert.ok(tchHtml.includes('colspan="2"'), '2 saatlik ders bloğu yatay colspan="2" ile birleştirilmeli');
+  assert.ok(clsHtml0.includes('colspan="2"'), 'Sınıf programında 2 saatlik blok yatay colspan="2" ile birleştirilmeli');
+  assert.ok(clsHtml0.includes('Yerleşim'), 'Sınıf programında alt Ders Listesi tablosu bulunmalı');
+
+  // Çarşaf şablonlarında yatay blok birleştirme ve zil saati başlıkları
+  const clsSheet = ExportEngine.buildCarsafPagesHtml(state, 'class_sheet', helpers, false);
+  const tchSheet = ExportEngine.buildCarsafPagesHtml(state, 'teacher_sheet', helpers, false);
+  assert.ok(clsSheet.includes('colspan="2"'));
+  assert.ok(tchSheet.includes('colspan="2"'));
+  assert.ok(clsSheet.includes('meb-day-group'));
+  assert.ok(tchSheet.includes('meb-day-group'));
 });
 
 test('Asama 4: 50 sube ve 100 ogretmenlik toplu PDF HTML uretimi + A3/A4 carsaf bolme', () => {

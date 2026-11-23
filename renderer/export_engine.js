@@ -53,7 +53,7 @@
       fitToPage: true,
       colorMode: 'color',
       teacherDisplay: 'full', // 'full' | 'code' | 'hidden'
-      splitA4Sheets: true,
+      splitA4Sheets: false,
       showTeacherTotals: true,
       evrakPlusEnforcement: 'development_open' // 'development_open' | 'strict_evrakplus'
     };
@@ -349,15 +349,15 @@
       * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       body {
         margin: 0; padding: 0;
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+        font-family: "Times New Roman", Times, Georgia, serif;
         font-size: ${baseFont};
-        color: #0f172a;
+        color: #000000;
         background: #ffffff;
       }
       .doc-page {
         page-break-after: always;
         break-after: page;
-        padding: 4mm 2mm;
+        padding: 4mm 3mm;
         position: relative;
       }
       .doc-page:last-child { page-break-after: auto; break-after: auto; }
@@ -366,64 +366,232 @@
         background: ${isBw ? '#f1f5f9' : '#fef2f2'};
         color: ${isBw ? '#000' : '#991b1b'};
         text-align: center;
-        font-weight: 800;
-        font-size: 13px;
-        padding: 5px 10px;
+        font-weight: 700;
+        font-size: 12px;
+        padding: 4px 10px;
         margin-bottom: 8px;
-        letter-spacing: 1px;
+        letter-spacing: 0.8px;
       }
-      .doc-header {
+      /* Resmi MEB / BİLSA Tarzı Üst Başlık */
+      .meb-top-header {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        border-bottom: 2px solid #1e293b;
-        padding-bottom: 6px;
+        justify-content: center;
+        gap: 10px;
+        text-align: center;
         margin-bottom: 10px;
       }
-      .doc-header-center { text-align: center; flex: 1; }
-      .doc-school { font-size: 1.35em; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; }
-      .doc-year { font-size: 0.95em; font-weight: 600; color: #334155; margin-top: 2px; }
-      .doc-title { font-size: 1.15em; font-weight: 700; color: ${isBw ? '#000' : '#1e3a8a'}; margin-top: 3px; }
-      .doc-meta-bar {
-        display: flex; justify-content: space-between; align-items: center;
-        font-size: 0.9em; background: ${isBw ? '#f8fafc' : '#eff6ff'};
-        border: 1px solid #cbd5e1; border-radius: 4px;
-        padding: 5px 10px; margin-bottom: 8px; font-weight: 600;
+      .meb-school-title {
+        font-size: 1.28em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        color: #000000;
+        line-height: 1.3;
       }
-      table.tt-table {
-        width: 100%; border-collapse: collapse; table-layout: fixed;
+      .meb-sub-title {
+        font-size: 1.12em;
+        font-weight: 700;
+        color: #000000;
+        margin-top: 2px;
       }
-      table.tt-table th, table.tt-table td {
-        border: 1px solid #64748b;
-        padding: 4px 5px;
+      .meb-meta-grid {
+        margin-bottom: 8px;
+        font-size: 1.02em;
+        line-height: 1.45;
+      }
+      .meb-meta-table {
+        border-collapse: collapse;
+        width: auto;
+      }
+      .meb-meta-table td {
+        border: none;
+        padding: 1px 8px 1px 0;
+        vertical-align: top;
+      }
+      .meb-meta-label { min-width: 96px; }
+      .meb-info-strip {
+        margin: 6px 0 8px 0;
+        font-size: 0.96em;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+      }
+      /* Ana Program ve Çarşaf Tablosu (Siyah İnce Çerçeve + Açık Mavi Saat Başlığı + Gri Gün Sütunu) */
+      table.meb-grid {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        margin-bottom: 12px;
+      }
+      table.meb-grid th, table.meb-grid td {
+        border: 1px solid #000000;
+        padding: 3px 3px;
         vertical-align: middle;
+        text-align: center;
         word-wrap: break-word;
         overflow-wrap: break-word;
+        line-height: 1.2;
       }
-      table.tt-table thead th {
-        background: ${isBw ? '#e2e8f0' : '#1e293b'};
-        color: ${isBw ? '#0f172a' : '#ffffff'};
+      table.meb-grid th.meb-corner {
+        border-top: none;
+        border-left: none;
+        background: transparent;
+      }
+      table.meb-grid th.meb-period-th {
+        background: ${isBw ? '#e5e7eb' : '#d9e1f8'};
+        color: #000000;
+        font-weight: 400;
+        padding: 3px 2px;
+      }
+      .meb-p-num { font-weight: 700; font-size: 1.02em; }
+      .meb-p-time { font-size: 0.88em; white-space: nowrap; }
+      table.meb-grid td.meb-day-td {
+        background: ${isBw ? '#e5e7eb' : '#d9d9d9'};
+        color: #000000;
+        font-weight: 700;
+        text-align: left;
+        padding: 6px 6px;
+        white-space: nowrap;
+      }
+      table.meb-grid td.meb-cell {
+        background: #ffffff;
+        height: 36px;
+        padding: 3px 3px;
+      }
+      table.meb-grid td.meb-cell-blocked {
+        background: #f3f4f6;
+        color: #6b7280;
+        font-size: 0.85em;
+      }
+      .meb-cell-top {
+        font-weight: 700;
+        font-size: 0.96em;
+        color: #000000;
+      }
+      .meb-cell-bottom {
+        font-weight: 400;
+        font-size: 0.92em;
+        color: #000000;
+        margin-top: 1px;
+      }
+      .meb-cell-room {
+        font-size: 0.78em;
+        color: #374151;
+        margin-top: 1px;
+      }
+      /* Alt Ders Listesi Tablosu */
+      .meb-list-heading {
+        font-weight: 700;
+        font-size: 1.02em;
+        margin: 8px 0 3px 0;
+      }
+      table.meb-course-list {
+        width: 88%;
+        border-collapse: collapse;
+        margin-bottom: 10px;
+        font-size: 0.92em;
+      }
+      table.meb-course-list th, table.meb-course-list td {
+        border: 1px solid #000000;
+        padding: 2.5px 5px;
+        vertical-align: middle;
+        line-height: 1.22;
+      }
+      table.meb-course-list thead th {
+        background: ${isBw ? '#e5e7eb' : '#d9e1f8'};
+        color: #000000;
         font-weight: 700;
         text-align: center;
       }
-      table.tt-table tbody tr:nth-child(even) { background: #f8fafc; }
-      .cell-code { font-weight: 800; font-size: 1em; color: #0f172a; }
-      .cell-name { font-weight: 600; font-size: 0.9em; color: #1e293b; line-height: 1.2; }
-      .cell-sub { font-size: 0.82em; color: ${isBw ? '#334155' : '#4338ca'}; font-weight: 600; }
-      .cell-lock { font-size: 0.75em; font-weight: 700; color: #b45309; }
+      /* Çarşaf Program Stili (Yatay Kompakt) */
+      table.meb-carsaf {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 0.76em;
+      }
+      table.meb-carsaf th, table.meb-carsaf td {
+        border: 1px solid #000000;
+        padding: 2px 1.5px;
+        vertical-align: middle;
+        text-align: center;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        line-height: 1.12;
+      }
+      table.meb-carsaf th.meb-day-group {
+        background: ${isBw ? '#e5e7eb' : '#d9d9d9'};
+        color: #000000;
+        font-weight: 700;
+        font-size: 1.15em;
+        padding: 3px 2px;
+      }
+      table.meb-carsaf th.meb-carsaf-p {
+        background: ${isBw ? '#f3f4f6' : '#c9d7f5'};
+        color: #000000;
+        font-weight: 400;
+        font-size: 0.86em;
+        padding: 2px 1px;
+      }
+      table.meb-carsaf td.meb-entity-td {
+        background: ${isBw ? '#e5e7eb' : '#d1d5db'};
+        color: #000000;
+        font-weight: 700;
+        text-align: left;
+        padding: 3px 4px;
+        font-size: 0.96em;
+      }
+      table.meb-carsaf td.meb-entity-class {
+        text-align: center;
+        font-size: 1.12em;
+      }
+      .meb-day-sep-left { border-left: 2px solid #000000 !important; }
+      .meb-day-sep-right { border-right: 2px solid #000000 !important; }
+      .meb-carsaf-top { font-weight: 700; font-size: 0.94em; color: #000000; }
+      .meb-carsaf-bot { font-weight: 400; font-size: 0.88em; color: #000000; }
+      /* Resmi Alt Metin ve İmza Düzeni */
+      .meb-effective-line {
+        margin: 10px 0 14px 0;
+        font-size: 0.98em;
+      }
+      .meb-sig-wrap {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 0 18px 0 36px;
+        font-size: 0.98em;
+        line-height: 1.45;
+      }
+      .meb-sig-left { text-align: left; min-width: 190px; }
+      .meb-sig-right { text-align: center; min-width: 180px; margin-top: 26px; }
+      .meb-metrics-note {
+        margin-top: 6px;
+        font-size: 0.82em;
+        color: #374151;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      /* Raporlar için standart tablo */
+      .doc-header {
+        display: flex; align-items: center; justify-content: space-between;
+        border-bottom: 2px solid #000000; padding-bottom: 6px; margin-bottom: 10px;
+      }
+      .doc-header-center { text-align: center; flex: 1; }
+      .doc-school { font-size: 1.25em; font-weight: 700; text-transform: uppercase; }
+      .doc-year { font-size: 0.95em; font-weight: 600; margin-top: 2px; }
+      .doc-title { font-size: 1.1em; font-weight: 700; margin-top: 2px; }
+      table.tt-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+      table.tt-table th, table.tt-table td { border: 1px solid #000000; padding: 3.5px 5px; vertical-align: middle; word-wrap: break-word; }
+      table.tt-table thead th { background: ${isBw ? '#e5e7eb' : '#d9e1f8'}; color: #000000; font-weight: 700; text-align: center; }
       .summary-strip {
         margin-top: 8px; display: flex; flex-wrap: wrap; gap: 12px;
-        font-size: 0.88em; border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 4px; background: #f8fafc;
+        font-size: 0.88em; border: 1px solid #000000; padding: 5px 8px; background: #f9fafb;
       }
-      .sig-block {
-        margin-top: 16px; display: flex; justify-content: space-between; padding: 0 24px; font-size: 0.92em;
-      }
-      .sig-col { text-align: center; min-width: 180px; }
-      .sig-role { font-weight: 700; color: #334155; }
-      .sig-name { margin-top: 28px; font-weight: 700; border-top: 1px solid #94a3b8; padding-top: 4px; }
       .doc-footer {
-        margin-top: 10px; font-size: 0.78em; color: #64748b;
-        display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 4px;
+        margin-top: 10px; font-size: 0.78em; color: #4b5563;
+        display: flex; justify-content: space-between; border-top: 1px solid #d1d5db; padding-top: 4px;
       }
     `;
   }
@@ -434,8 +602,8 @@
     const year = (state.school && state.school.academicYear) || '2026–2027';
     const dateStr = es.showDate ? new Date().toLocaleDateString('tr-TR') : '';
     const logoHtml = (es.showLogo && es.logoDataUrl)
-      ? `<img src="${es.logoDataUrl}" alt="Logo" style="height:48px;width:auto;object-fit:contain;" />`
-      : `<div style="width:48px;"></div>`;
+      ? `<img src="${es.logoDataUrl}" alt="Logo" style="height:44px;width:auto;object-fit:contain;" />`
+      : `<div style="width:44px;"></div>`;
 
     return `
       ${isDraft ? `<div class="draft-banner">TASLAK – DOĞRULANMAMIŞ PROGRAM</div>` : ''}
@@ -446,36 +614,27 @@
           <div class="doc-year">${escapeHtml(year)} Eğitim Öğretim Yılı</div>
           <div class="doc-title">${escapeHtml(es.customTitle ? `${es.customTitle} — ${titleText}` : titleText)}</div>
         </div>
-        <div style="min-width:75px;text-align:right;font-size:0.82em;color:#475569;">${escapeHtml(dateStr)}</div>
-      </div>
-    `;
-  }
-
-  function renderSignatureBlock(state) {
-    const es = { ...createDefaultExportSettings(), ...(state.exportSettings || {}) };
-    if (!es.showSignatures) return '';
-    const coord = (es.coordinatorName || (state.school && state.school.coordinator) || '').trim();
-    const principal = (es.principalName || '').trim();
-
-    return `
-      <div class="sig-block">
-        <div class="sig-col">
-          <div class="sig-role">Hazırlayan (Program Sorumlusu)</div>
-          <div class="sig-name">${coord ? escapeHtml(coord) : '................................'}</div>
-        </div>
-        <div class="sig-col">
-          <div class="sig-role">Onaylayan (Okul Müdürü)</div>
-          <div class="sig-name">${principal ? escapeHtml(principal) : '................................'}</div>
-        </div>
+        <div style="min-width:75px;text-align:right;font-size:0.84em;">${escapeHtml(dateStr)}</div>
       </div>
     `;
   }
 
   function renderFooterBlock(state, isDraft, pageNum, totalPages) {
     const es = { ...createDefaultExportSettings(), ...(state.exportSettings || {}) };
-    const left = es.footerText ? escapeHtml(es.footerText) : (isDraft ? 'TASLAK ÇIKTI' : 'Google OR-Tools CP-SAT ile doğrulanmıştır');
-    const right = totalPages ? `Sayfa ${pageNum} / ${totalPages}` : '';
+    const left = es.footerText ? escapeHtml(es.footerText) : (isDraft ? 'TASLAK ÇIKTI' : '');
+    const right = totalPages && totalPages > 1 ? `Sayfa ${pageNum} / ${totalPages}` : '';
+    if (!left && !right) return '';
     return `<div class="doc-footer"><span>${left}</span><span>${right}</span></div>`;
+  }
+
+  function getTeacherInitials(t) {
+    if (!t) return '';
+    if (t.shortCode && String(t.shortCode).trim()) return String(t.shortCode).trim();
+    const parts = String(t.name || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return parts.map((p) => p[0]).join('').toLocaleUpperCase('tr-TR');
+    }
+    return String(t.name || '').slice(0, 3).toLocaleUpperCase('tr-TR');
   }
 
   function formatTeacherForCell(teacherIds, tMap, mode) {
@@ -483,17 +642,109 @@
     return (teacherIds || []).map((id) => {
       const t = tMap[id];
       if (!t) return '';
-      return mode === 'code' ? (t.shortCode || t.name.slice(0, 3).toUpperCase()) : t.name;
+      return mode === 'code' ? getTeacherInitials(t) : t.name;
     }).filter(Boolean).join(', ');
   }
 
+  function formatSchoolDirectorateTitle(schoolName) {
+    const raw = String(schoolName || 'OKUL DERS DAĞITIM PROGRAMI').trim();
+    if (/müdürlüğü$/i.test(raw)) return raw;
+    return `${raw} MÜDÜRLÜĞÜ`;
+  }
+
+  function formatDateSlashTr(dateObj) {
+    const d = dateObj || new Date();
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  /**
+   * Aynı gün içinde ardışık blokları colspan ile yatay birleştirir (örnek şablonlardaki gibi).
+   */
+  function renderMergedDayCells(periods, origDay, cIdx, state, lookupFn, renderCellFn, renderEmptyFn, extraDayBoundary = false) {
+    let html = '';
+    let p = 0;
+    while (p < periods) {
+      const isFirst = p === 0;
+      const slotStatus = (state.grid.slots[origDay] && state.grid.slots[origDay][p]) || 'ACTIVE';
+      if (slotStatus === 'BLOCKED') {
+        const clsBorder = extraDayBoundary && isFirst ? ' meb-day-sep-left' : '';
+        html += `<td class="meb-cell meb-cell-blocked${clsBorder}">Kapalı</td>`;
+        p += 1;
+        continue;
+      }
+      const pl = lookupFn(cIdx, p);
+      if (!pl) {
+        const clsBorder = extraDayBoundary && isFirst ? ' meb-day-sep-left' : '';
+        html += renderEmptyFn(origDay, p, clsBorder);
+        p += 1;
+        continue;
+      }
+      // Aynı yerleştirme bloğunun (veya aynı ders+sınıf+öğretmen ardışık saatinin) süresini hesapla
+      let span = 1;
+      while (p + span < periods) {
+        const nextStatus = (state.grid.slots[origDay] && state.grid.slots[origDay][p + span]) || 'ACTIVE';
+        if (nextStatus === 'BLOCKED') break;
+        const nextPl = lookupFn(cIdx, p + span);
+        if (!nextPl) break;
+        const sameBlock = (nextPl === pl) || (
+          nextPl.assignment_id && pl.assignment_id && nextPl.assignment_id === pl.assignment_id && nextPl.block_index === pl.block_index
+        );
+        if (!sameBlock) break;
+        span += 1;
+      }
+      const clsBorder = extraDayBoundary && isFirst ? ' meb-day-sep-left' : '';
+      html += renderCellFn(pl, span, clsBorder);
+      p += span;
+    }
+    return html;
+  }
+
+  function buildPlacementSummaryRows(placements, groupByKeyFn) {
+    const map = new Map();
+    (placements || []).forEach((pl) => {
+      const key = groupByKeyFn(pl);
+      if (!map.has(key)) {
+        map.set(key, {
+          courseCode: pl.course_code || '',
+          courseName: pl.course_name || pl.course_code || '',
+          className: pl.class_name || '',
+          teacherIds: new Set(pl.teacher_ids || []),
+          blocks: [],
+          totalHours: 0
+        });
+      }
+      const rec = map.get(key);
+      (pl.teacher_ids || []).forEach((tid) => rec.teacherIds.add(tid));
+      const len = Number(pl.length || 0);
+      if (len > 0) {
+        rec.blocks.push(len);
+        rec.totalHours += len;
+      }
+    });
+    return Array.from(map.values()).map((r) => {
+      r.blocks.sort((a, b) => b - a);
+      return {
+        ...r,
+        placementPattern: r.blocks.join('+'),
+        teacherIds: Array.from(r.teacherIds)
+      };
+    }).sort((a, b) => (b.totalHours - a.totalHours) || a.className.localeCompare(b.className, 'tr') || a.courseName.localeCompare(b.courseName, 'tr'));
+  }
+
+  /* =========================================================================
+     ŞABLON 1: SINIF DERS PROGRAMI (Örnek MEB Şablonu: Günler Satır, Saatler Sütun + Alt Ders Listesi)
+     ========================================================================= */
   function buildClassTimetablePageHtml(state, cls, helpers, isDraft, pageIdx, totalPages) {
     const es = { ...createDefaultExportSettings(), ...(state.exportSettings || {}) };
     const gridStats = helpers.getSlotStats();
+    const periods = state.grid.periodsPerDay;
     const bell = helpers.computeBellSchedule ? helpers.computeBellSchedule() : { primary: [], afternoon: null, isDouble: false };
     const isAfternoon = bell.isDouble && cls.shift === 'afternoon' && bell.afternoon;
     const scheduleArr = isAfternoon ? bell.afternoon : bell.primary;
-    const shiftLabel = bell.isDouble ? (cls.shift === 'afternoon' ? 'Öğlenci Devresi' : 'Sabahçı Devresi') : 'Tam Gün (Tekli Öğretim)';
+    const shiftLabel = bell.isDouble ? (cls.shift === 'afternoon' ? 'Öğlenci Devresi' : 'Sabahçı Devresi') : '';
 
     const teachers = helpers.getCurrentTeachers();
     const rooms = helpers.getCurrentRooms();
@@ -508,62 +759,130 @@
       for (let k = 0; k < pl.length; k++) cellMap[`${pl.day_index}_${pl.start_period + k}`] = pl;
     });
 
-    const rowsHtml = Array.from({ length: state.grid.periodsPerDay }, (_, pIdx) => {
+    const periodHeadersHtml = Array.from({ length: periods }, (_, pIdx) => {
       const b = scheduleArr[pIdx] || { period: pIdx + 1, start: '', end: '' };
-      const tds = gridStats.activeDayIndices.map((origDay, cIdx) => {
-        if (((state.grid.slots[origDay] && state.grid.slots[origDay][pIdx]) || 'ACTIVE') === 'BLOCKED') {
-          return `<td style="text-align:center;color:#94a3b8;background:#f1f5f9;">Kapalı</td>`;
-        }
-        const pl = cellMap[`${cIdx}_${pIdx}`];
-        if (!pl) return `<td style="text-align:center;color:#cbd5e1;">—</td>`;
-        const tText = formatTeacherForCell(pl.teacher_ids, tMap, es.teacherDisplay);
-        const rText = pl.room_id && rMap[pl.room_id] ? rMap[pl.room_id].name : '';
-        return `
-          <td>
-            <div class="cell-code">${escapeHtml(pl.course_code)}</div>
-            <div class="cell-name">${escapeHtml(pl.course_name)}</div>
-            ${tText ? `<div class="cell-sub">${escapeHtml(tText)}</div>` : ''}
-            ${rText ? `<div class="cell-sub">[${escapeHtml(rText)}]</div>` : ''}
-          </td>
-        `;
-      }).join('');
       return `
-        <tr>
-          <td style="text-align:center;font-weight:700;width:95px;">
-            <div>${b.period}. Ders</div>
-            <div style="font-size:0.82em;color:#475569;font-weight:500;">${escapeHtml(b.start)}–${escapeHtml(b.end)}</div>
-          </td>
-          ${tds}
-        </tr>
+        <th class="meb-period-th">
+          <div class="meb-p-num">${b.period}</div>
+          <div class="meb-p-time">${escapeHtml(b.start)}</div>
+          <div class="meb-p-time">${escapeHtml(b.end)}</div>
+          <span style="display:none;">${escapeHtml(b.start)}–${escapeHtml(b.end)}</span>
+        </th>
       `;
     }).join('');
 
+    const dayRowsHtml = gridStats.activeDayIndices.map((origDay, cIdx) => {
+      const cells = renderMergedDayCells(
+        periods,
+        origDay,
+        cIdx,
+        state,
+        (dIdx, pIdx) => cellMap[`${dIdx}_${pIdx}`],
+        (pl, span) => {
+          const tShort = formatTeacherForCell(pl.teacher_ids, tMap, es.teacherDisplay === 'hidden' ? 'hidden' : (es.teacherDisplay === 'full' ? 'code' : es.teacherDisplay));
+          const rText = pl.room_id && rMap[pl.room_id] ? rMap[pl.room_id].name : '';
+          return `
+            <td class="meb-cell"${span > 1 ? ` colspan="${span}"` : ''}>
+              <div class="meb-cell-top">${escapeHtml(pl.course_code || pl.course_name)}</div>
+              ${tShort ? `<div class="meb-cell-bottom">${escapeHtml(tShort)}</div>` : ''}
+              ${rText ? `<div class="meb-cell-room">${escapeHtml(rText)}</div>` : ''}
+            </td>
+          `;
+        },
+        () => `<td class="meb-cell"></td>`,
+        false
+      );
+      return `<tr><td class="meb-day-td">${DAY_NAMES[origDay]}</td>${cells}</tr>`;
+    }).join('');
+
+    const summaryRows = buildPlacementSummaryRows(placements, (pl) => pl.assignment_id || `${pl.course_code}__${pl.course_name}`);
+    const summaryTableHtml = `
+      <table class="meb-course-list">
+        <thead>
+          <tr>
+            <th style="width:28px;">S</th>
+            <th style="width:70px;">Ders</th>
+            <th>Ders Adı</th>
+            <th style="width:170px;">Öğretmenler</th>
+            <th style="width:74px;">Yerleşim</th>
+            <th style="width:42px;">Saat</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${summaryRows.map((row, idx) => {
+            const fullTeachers = formatTeacherForCell(row.teacherIds, tMap, es.teacherDisplay === 'hidden' ? 'hidden' : 'full');
+            return `
+              <tr>
+                <td style="text-align:center;">${idx + 1}</td>
+                <td style="text-align:center;">${escapeHtml(row.courseCode)}</td>
+                <td>${escapeHtml(row.courseName)}</td>
+                <td>${escapeHtml(fullTeachers || '-')}</td>
+                <td style="text-align:center;">${escapeHtml(row.placementPattern)}</td>
+                <td style="text-align:center;">${row.totalHours}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    const schoolName = (state.school && state.school.name) || 'OKUL DERS DAĞITIM PROGRAMI';
+    const advisorName = cls.advisorTeacher || '-';
+    const principal = (es.principalName || '').trim();
+    const dateStr = formatDateSlashTr(new Date());
+    const logoHtml = (es.showLogo && es.logoDataUrl)
+      ? `<img src="${es.logoDataUrl}" alt="Logo" style="height:40px;width:auto;object-fit:contain;" />`
+      : '';
+
     return `
       <div class="doc-page">
-        ${renderHeaderBlock(state, `${cls.name} Sınıfı Haftalık Ders Programı`, isDraft)}
-        <div class="doc-meta-bar">
-          <span>Şube: ${escapeHtml(cls.name)}${cls.homeRoom ? ` (Derslik: ${escapeHtml(cls.homeRoom)})` : ''}</span>
-          <span>Öğretim Devresi: ${escapeHtml(shiftLabel)}</span>
-          <span>Haftalık Toplam Ders: ${totalHours} Saat</span>
+        ${isDraft ? `<div class="draft-banner">TASLAK – DOĞRULANMAMIŞ PROGRAM</div>` : ''}
+        <div class="meb-top-header">
+          ${logoHtml}
+          <div>
+            <div class="meb-school-title">${escapeHtml(schoolName)}</div>
+            <div class="meb-sub-title">${escapeHtml(es.customTitle || 'Sınıflar Ders Programı')}</div>
+          </div>
         </div>
-        <table class="tt-table">
+        <div class="meb-meta-grid">
+          <table class="meb-meta-table">
+            <tr><td class="meb-meta-label">Sınıf/Grup</td><td>: ${escapeHtml(cls.name)}${cls.homeRoom ? ` (${escapeHtml(cls.homeRoom)})` : ''}${shiftLabel ? ` — ${escapeHtml(shiftLabel)}` : ''}</td></tr>
+            <tr><td class="meb-meta-label">Toplam Saat</td><td>: ${totalHours}</td></tr>
+            <tr><td class="meb-meta-label">Sınıf Rehber Öğretmeni</td><td>: ${escapeHtml(advisorName)}</td></tr>
+          </table>
+        </div>
+        <table class="meb-grid">
           <thead>
             <tr>
-              <th style="width:95px;">Ders / Saat</th>
-              ${gridStats.activeDayIndices.map((d) => `<th>${DAY_NAMES[d]}</th>`).join('')}
+              <th class="meb-corner" style="width:90px;"></th>
+              ${periodHeadersHtml}
             </tr>
           </thead>
-          <tbody>${rowsHtml}</tbody>
+          <tbody>${dayRowsHtml}</tbody>
         </table>
-        ${renderSignatureBlock(state)}
+        ${summaryTableHtml}
+        ${es.showDate ? `<div class="meb-effective-line">Yukarıdaki program ${escapeHtml(dateStr)} tarihinden itibaren geçerli olacaktır.</div>` : ''}
+        ${es.showSignatures ? `
+          <div class="meb-sig-wrap">
+            <div class="meb-sig-left"></div>
+            <div class="meb-sig-right">
+              <div>${principal ? escapeHtml(principal) : '................................'}</div>
+              <div>Okul Müdürü</div>
+            </div>
+          </div>
+        ` : ''}
         ${renderFooterBlock(state, isDraft, pageIdx, totalPages)}
       </div>
     `;
   }
 
+  /* =========================================================================
+     ŞABLON 2: ÖĞRETMEN DERS PROGRAMI (Örnek MEB Şablonu: Günler Satır + Ders Listesi + Aslını Aldım)
+     ========================================================================= */
   function buildTeacherTimetablePageHtml(state, teacher, helpers, isDraft, pageIdx, totalPages) {
     const es = { ...createDefaultExportSettings(), ...(state.exportSettings || {}) };
     const gridStats = helpers.getSlotStats();
+    const periods = state.grid.periodsPerDay;
     const bell = helpers.computeBellSchedule ? helpers.computeBellSchedule() : { primary: [], afternoon: null, isDouble: false };
     const rooms = helpers.getCurrentRooms();
     const rMap = Object.fromEntries(rooms.map((r) => [r.id, r]));
@@ -576,87 +895,167 @@
       for (let k = 0; k < pl.length; k++) cellMap[`${pl.day_index}_${pl.start_period + k}`] = pl;
     });
 
-    const rowsHtml = Array.from({ length: state.grid.periodsPerDay }, (_, pIdx) => {
+    const periodHeadersHtml = Array.from({ length: periods }, (_, pIdx) => {
       const b = bell.primary[pIdx] || { period: pIdx + 1, start: '', end: '' };
-      const tds = gridStats.activeDayIndices.map((origDay, cIdx) => {
-        if (((state.grid.slots[origDay] && state.grid.slots[origDay][pIdx]) || 'ACTIVE') === 'BLOCKED') {
-          return `<td style="text-align:center;color:#94a3b8;background:#f1f5f9;">Kapalı</td>`;
-        }
-        const pl = cellMap[`${cIdx}_${pIdx}`];
-        if (!pl) {
-          const isUnav = teacher.availability && teacher.availability[origDay] && teacher.availability[origDay][pIdx] === 'UNAVAILABLE';
-          return `<td style="text-align:center;color:${isUnav ? '#ef4444' : '#cbd5e1'};">${isUnav ? 'Kapalı' : '—'}</td>`;
-        }
-        const rText = pl.room_id && rMap[pl.room_id] ? rMap[pl.room_id].name : '';
-        return `
-          <td>
-            <div class="cell-code">${escapeHtml(pl.class_name)} — ${escapeHtml(pl.course_code)}</div>
-            <div class="cell-name">${escapeHtml(pl.course_name)}</div>
-            ${rText ? `<div class="cell-sub">[${escapeHtml(rText)}]</div>` : ''}
-          </td>
-        `;
-      }).join('');
       return `
-        <tr>
-          <td style="text-align:center;font-weight:700;width:95px;">
-            <div>${b.period}. Ders</div>
-            <div style="font-size:0.82em;color:#475569;font-weight:500;">${escapeHtml(b.start)}–${escapeHtml(b.end)}</div>
-          </td>
-          ${tds}
-        </tr>
+        <th class="meb-period-th">
+          <div class="meb-p-num">${b.period}</div>
+          <div class="meb-p-time">${escapeHtml(b.start)}</div>
+          <div class="meb-p-time">${escapeHtml(b.end)}</div>
+        </th>
       `;
     }).join('');
 
-    const dailyBreakdown = gridStats.activeDayIndices
-      .map((d, idx) => `${DAY_SHORT[d]}: ${metrics.dailyHours[idx]} sa`)
-      .join(' · ');
+    const dayRowsHtml = gridStats.activeDayIndices.map((origDay, cIdx) => {
+      const cells = renderMergedDayCells(
+        periods,
+        origDay,
+        cIdx,
+        state,
+        (dIdx, pIdx) => cellMap[`${dIdx}_${pIdx}`],
+        (pl, span) => {
+          const rText = pl.room_id && rMap[pl.room_id] ? rMap[pl.room_id].name : '';
+          return `
+            <td class="meb-cell"${span > 1 ? ` colspan="${span}"` : ''}>
+              <div class="meb-cell-top">${escapeHtml(pl.class_name)}</div>
+              <div class="meb-cell-bottom">${escapeHtml(pl.course_code || pl.course_name)}</div>
+              ${rText ? `<div class="meb-cell-room">${escapeHtml(rText)}</div>` : ''}
+            </td>
+          `;
+        },
+        () => `<td class="meb-cell"></td>`,
+        false
+      );
+      return `<tr><td class="meb-day-td">${DAY_NAMES[origDay]}</td>${cells}</tr>`;
+    }).join('');
+
+    const summaryRows = buildPlacementSummaryRows(placements, (pl) => `${pl.class_name}__${pl.assignment_id || pl.course_code}`);
+    const summaryTableHtml = `
+      <div class="meb-list-heading">Ders Listesi:</div>
+      <table class="meb-course-list">
+        <thead>
+          <tr>
+            <th style="width:28px;">S</th>
+            <th style="width:72px;">Ders</th>
+            <th>Ders Adı</th>
+            <th style="width:76px;">Sınıflar</th>
+            <th style="width:74px;">Yerleşim</th>
+            <th style="width:42px;">Saat</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${summaryRows.map((row, idx) => `
+            <tr>
+              <td style="text-align:center;">${idx + 1}</td>
+              <td style="text-align:center;">${escapeHtml(row.courseCode)}</td>
+              <td>${escapeHtml(row.courseName)}</td>
+              <td style="text-align:center;">${escapeHtml(row.className)}</td>
+              <td style="text-align:center;">${escapeHtml(row.placementPattern)}</td>
+              <td style="text-align:center;">${row.totalHours}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+
+    const schoolTitle = formatSchoolDirectorateTitle((state.school && state.school.name) || 'OKUL DERS DAĞITIM PROGRAMI');
+    const principal = (es.principalName || '').trim();
+    const dateStr = formatDateSlashTr(new Date());
+    const dutyText = teacher.dutyDay || '-';
+    const guidanceClass = teacher.guidanceClass || '-';
+    const clubText = teacher.socialClub || '-';
+    const logoHtml = (es.showLogo && es.logoDataUrl)
+      ? `<img src="${es.logoDataUrl}" alt="Logo" style="height:40px;width:auto;object-fit:contain;" />`
+      : '';
 
     return `
       <div class="doc-page">
-        ${renderHeaderBlock(state, `Öğretmen Haftalık Ders Programı`, isDraft)}
-        <div class="doc-meta-bar">
-          <span>Öğretmen: ${escapeHtml(teacher.name)}</span>
-          <span>Branş: ${escapeHtml(teacher.branch)}</span>
-          <span>Haftalık Toplam Ders: ${metrics.totalHours} Saat</span>
+        ${isDraft ? `<div class="draft-banner">TASLAK – DOĞRULANMAMIŞ PROGRAM</div>` : ''}
+        <div class="meb-top-header">
+          ${logoHtml}
+          <div class="meb-school-title">${escapeHtml(schoolTitle)}</div>
         </div>
-        <table class="tt-table">
+        <div class="meb-meta-grid">
+          <table class="meb-meta-table">
+            <tr><td class="meb-meta-label">Sayı</td><td>:</td></tr>
+            <tr><td class="meb-meta-label">Öğretmen</td><td>: ${escapeHtml(teacher.name)}</td></tr>
+            <tr><td class="meb-meta-label">Toplam Saat</td><td>: ${metrics.totalHours}</td></tr>
+          </table>
+        </div>
+        <div class="meb-info-strip">
+          <span>Nöbet Günü: ${escapeHtml(dutyText)}</span>
+          <span>Sınıf Rehberliği: ${escapeHtml(guidanceClass)}</span>
+          <span>Sosyal Kulüp: ${escapeHtml(clubText)}</span>
+        </div>
+        <table class="meb-grid">
           <thead>
             <tr>
-              <th style="width:95px;">Ders / Saat</th>
-              ${gridStats.activeDayIndices.map((d) => `<th>${DAY_NAMES[d]}</th>`).join('')}
+              <th class="meb-corner" style="width:90px;"></th>
+              ${periodHeadersHtml}
             </tr>
           </thead>
-          <tbody>${rowsHtml}</tbody>
+          <tbody>${dayRowsHtml}</tbody>
         </table>
-        ${es.showTeacherTotals ? `
-          <div class="summary-strip">
-            <span><strong>Haftalık Toplam:</strong> ${metrics.totalHours} sa</span>
-            <span><strong>Ders Verilen Gün:</strong> ${metrics.workingDays} gün</span>
-            <span><strong>Haftalık Boş Pencere:</strong> ${metrics.totalGaps}</span>
-            <span><strong>Maks. Ardışık Ders:</strong> ${metrics.maxConsecutive} sa</span>
-            <span><strong>Günlük Dağılım:</strong> ${escapeHtml(dailyBreakdown)}</span>
+        ${summaryTableHtml}
+        ${es.showDate ? `<div class="meb-effective-line">Yukarıdaki dersler ${escapeHtml(dateStr)} tarihinden itibaren uygulanacaktır. Bilgilerinizi rica ederim.</div>` : ''}
+        ${es.showSignatures ? `
+          <div class="meb-sig-wrap">
+            <div class="meb-sig-left">
+              <div>${escapeHtml(dateStr)}</div>
+              <div>Aslını Aldım</div>
+              <div>${escapeHtml(teacher.name)}</div>
+            </div>
+            <div class="meb-sig-right">
+              <div>${principal ? escapeHtml(principal) : '................................'}</div>
+              <div>Okul Müdürü</div>
+            </div>
           </div>
         ` : ''}
-        ${renderSignatureBlock(state)}
+        ${es.showTeacherTotals ? `
+          <div class="meb-metrics-note">
+            <span>Çalışma Günü: ${metrics.workingDays}</span>
+            <span>Haftalık Boş Pencere: ${metrics.totalGaps}</span>
+            <span>Maks. Ardışık: ${metrics.maxConsecutive} sa</span>
+          </div>
+        ` : ''}
         ${renderFooterBlock(state, isDraft, pageIdx, totalPages)}
       </div>
     `;
   }
 
+  /* =========================================================================
+     ŞABLON 3 & 4: SINIF ÇARŞAF VE ÖĞRETMEN ÇARŞAF PROGRAMI (Yatay MEB Çarşaf + Blok Colspan)
+     ========================================================================= */
   function buildCarsafPagesHtml(state, mode, helpers, isDraft, filterOpts = {}) {
     const es = { ...createDefaultExportSettings(), ...(state.exportSettings || {}) };
     const gridStats = helpers.getSlotStats();
     const periods = state.grid.periodsPerDay;
+    const bell = helpers.computeBellSchedule ? helpers.computeBellSchedule() : { primary: [], afternoon: null, isDouble: false };
     const placements = (state.solution && state.solution.placements) || [];
     const teachers = helpers.getCurrentTeachers();
     const classes = helpers.getCurrentClasses();
     const tMap = Object.fromEntries(teachers.map((t) => [t.id, t]));
+    const schoolName = (state.school && state.school.name) || '';
 
-    // A4'te çok sayfalı bölme: A4 seçili ve splitA4Sheets aktifse günleri 2 veya 3'erli sayfalara böl
     const allDays = gridStats.activeDayIndices.map((origDay, cIdx) => ({ origDay, cIdx, name: DAY_NAMES[origDay] }));
     const dayChunks = (es.pageSize === 'A4' && es.splitA4Sheets && allDays.length > 3)
       ? [allDays.slice(0, 3), allDays.slice(3)]
       : [allDays];
+
+    function buildPeriodSubheaders(dChunk) {
+      return dChunk.map(() =>
+        Array.from({ length: periods }, (_, p) => {
+          const b = bell.primary[p] || { period: p + 1, start: '', end: '' };
+          return `
+            <th class="meb-carsaf-p${p === 0 ? ' meb-day-sep-left' : ''}">
+              <div style="font-weight:700;">${b.period}</div>
+              <div>${escapeHtml(b.start)}</div>
+              <div>${escapeHtml(b.end)}</div>
+            </th>
+          `;
+        }).join('')
+      ).join('');
+    }
 
     if (mode === 'class_sheet') {
       let targetClasses = [...classes].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
@@ -675,34 +1074,45 @@
 
       const pages = [];
       dayChunks.forEach((dChunk, chunkIdx) => {
-        const dayTitle = dayChunks.length > 1 ? ` (Günler: ${dChunk.map((d) => d.name).join(', ')})` : '';
+        const dayTitle = dayChunks.length > 1 ? ` (${dChunk.map((d) => d.name).join(' - ')})` : '';
         const rowsHtml = targetClasses.map((cls) => {
-          let totalH = 0;
-          placements.filter((p) => p.class_id === cls.id).forEach((p) => { totalH += p.length; });
           const tds = dChunk.map(({ origDay, cIdx }) =>
-            Array.from({ length: periods }, (_, p) => {
-              if (((state.grid.slots[origDay] && state.grid.slots[origDay][p]) || 'ACTIVE') === 'BLOCKED') return `<td style="text-align:center;color:#94a3b8;background:#f1f5f9;">—</td>`;
-              const pl = cellMap[cls.id] && cellMap[cls.id][`${cIdx}_${p}`];
-              if (!pl) return `<td style="text-align:center;color:#cbd5e1;">·</td>`;
-              const tCode = formatTeacherForCell(pl.teacher_ids, tMap, es.teacherDisplay === 'hidden' ? 'hidden' : 'code');
-              return `<td style="text-align:center;padding:2px;"><div style="font-weight:800;font-size:0.88em;">${escapeHtml(pl.course_code)}</div>${tCode ? `<div style="font-size:0.75em;color:#4338ca;">${escapeHtml(tCode)}</div>` : ''}</td>`;
-            }).join('')
+            renderMergedDayCells(
+              periods,
+              origDay,
+              cIdx,
+              state,
+              (dIdx, pIdx) => cellMap[cls.id] && cellMap[cls.id][`${dIdx}_${pIdx}`],
+              (pl, span, clsBorder) => {
+                const tCode = formatTeacherForCell(pl.teacher_ids, tMap, es.teacherDisplay === 'hidden' ? 'hidden' : 'code');
+                return `
+                  <td class="${clsBorder.trim()}"${span > 1 ? ` colspan="${span}"` : ''}>
+                    <div class="meb-carsaf-top">${escapeHtml(pl.course_code || pl.course_name)}</div>
+                    ${tCode ? `<div class="meb-carsaf-bot">${escapeHtml(tCode)}</div>` : ''}
+                  </td>
+                `;
+              },
+              (_origDay, _p, clsBorder) => `<td class="${clsBorder.trim()}"></td>`,
+              true
+            )
           ).join('');
-          return `<tr><td style="font-weight:800;">${escapeHtml(cls.name)}</td>${tds}<td style="text-align:center;font-weight:800;">${totalH}</td></tr>`;
+          return `<tr><td class="meb-entity-td meb-entity-class">${escapeHtml(cls.name)}</td>${tds}</tr>`;
         }).join('');
 
         pages.push(`
           <div class="doc-page">
-            ${renderHeaderBlock(state, `Sınıf Çarşaf Programı${dayTitle}`, isDraft)}
-            <table class="tt-table">
+            ${isDraft ? `<div class="draft-banner">TASLAK – DOĞRULANMAMIŞ PROGRAM</div>` : ''}
+            <div class="meb-top-header" style="margin-bottom:6px;">
+              <div class="meb-sub-title">${escapeHtml(schoolName ? `${schoolName} - Sınıflar Ders Programı${dayTitle}` : `Sınıflar Ders Programı${dayTitle}`)}</div>
+            </div>
+            <table class="meb-carsaf">
               <thead>
                 <tr>
-                  <th rowspan="2" style="width:64px;">Şube</th>
-                  ${dChunk.map((d) => `<th colspan="${periods}">${d.name}</th>`).join('')}
-                  <th rowspan="2" style="width:42px;">Top.</th>
+                  <th class="meb-corner" rowspan="2" style="width:44px;border-top:none;border-left:none;"></th>
+                  ${dChunk.map((d) => `<th class="meb-day-group meb-day-sep-left" colspan="${periods}">${d.name}</th>`).join('')}
                 </tr>
                 <tr>
-                  ${dChunk.map(() => Array.from({ length: periods }, (_, p) => `<th>${p + 1}</th>`).join('')).join('')}
+                  ${buildPeriodSubheaders(dChunk)}
                 </tr>
               </thead>
               <tbody>${rowsHtml}</tbody>
@@ -733,36 +1143,40 @@
 
     const pages = [];
     dayChunks.forEach((dChunk, chunkIdx) => {
-      const dayTitle = dayChunks.length > 1 ? ` (Günler: ${dChunk.map((d) => d.name).join(', ')})` : '';
+      const dayTitle = dayChunks.length > 1 ? ` (${dChunk.map((d) => d.name).join(' - ')})` : '';
       const rowsHtml = targetTeachers.map((t) => {
-        const m = computeTeacherDayMetrics(t.id, placements, allDays.length);
         const tds = dChunk.map(({ origDay, cIdx }) =>
-          Array.from({ length: periods }, (_, p) => {
-            if (((state.grid.slots[origDay] && state.grid.slots[origDay][p]) || 'ACTIVE') === 'BLOCKED') return `<td style="text-align:center;color:#94a3b8;background:#f1f5f9;">—</td>`;
-            const pl = cellMap[t.id] && cellMap[t.id][`${cIdx}_${p}`];
-            if (pl) {
-              return `<td style="text-align:center;padding:2px;"><div style="font-weight:800;font-size:0.86em;">${escapeHtml(pl.class_name)}</div><div style="font-size:0.75em;color:#065f46;">${escapeHtml(pl.course_code)}</div></td>`;
-            }
-            const isUnav = t.availability && t.availability[origDay] && t.availability[origDay][p] === 'UNAVAILABLE';
-            return `<td style="text-align:center;color:${isUnav ? '#ef4444' : '#cbd5e1'};">${isUnav ? '×' : '·'}</td>`;
-          }).join('')
+          renderMergedDayCells(
+            periods,
+            origDay,
+            cIdx,
+            state,
+            (dIdx, pIdx) => cellMap[t.id] && cellMap[t.id][`${dIdx}_${pIdx}`],
+            (pl, span, clsBorder) => `
+              <td class="${clsBorder.trim()}"${span > 1 ? ` colspan="${span}"` : ''}>
+                <div class="meb-carsaf-top">${escapeHtml(pl.class_name)}</div>
+                <div class="meb-carsaf-bot">${escapeHtml(pl.course_code || pl.course_name)}</div>
+              </td>
+            `,
+            (_origDay, _p, clsBorder) => `<td class="${clsBorder.trim()}"></td>`,
+            true
+          )
         ).join('');
-        return `<tr><td><div style="font-weight:700;">${escapeHtml(t.name)}</div><div style="font-size:0.78em;color:#64748b;">${escapeHtml(t.branch)}</div></td>${tds}<td style="text-align:center;font-weight:800;">${m.totalHours}</td><td style="text-align:center;font-weight:800;">${m.totalGaps}</td></tr>`;
+        return `<tr><td class="meb-entity-td">${escapeHtml(t.name)}</td>${tds}</tr>`;
       }).join('');
 
       pages.push(`
         <div class="doc-page">
-          ${renderHeaderBlock(state, `Öğretmen Çarşaf Programı${dayTitle}`, isDraft)}
-          <table class="tt-table">
+          ${isDraft ? `<div class="draft-banner">TASLAK – DOĞRULANMAMIŞ PROGRAM</div>` : ''}
+          ${dayTitle || schoolName ? `<div class="meb-top-header" style="margin-bottom:5px;"><div class="meb-sub-title">${escapeHtml(schoolName ? `${schoolName} - Öğretmen Çarşaf Programı${dayTitle}` : `Öğretmen Çarşaf Programı${dayTitle}`)}</div></div>` : ''}
+          <table class="meb-carsaf">
             <thead>
               <tr>
-                <th rowspan="2" style="width:135px;">Öğretmen / Branş</th>
-                ${dChunk.map((d) => `<th colspan="${periods}">${d.name}</th>`).join('')}
-                <th rowspan="2" style="width:38px;">Saat</th>
-                <th rowspan="2" style="width:38px;">Boş</th>
+                <th class="meb-corner" rowspan="2" style="width:105px;border-top:none;border-left:none;"></th>
+                ${dChunk.map((d) => `<th class="meb-day-group meb-day-sep-left" colspan="${periods}">${d.name}</th>`).join('')}
               </tr>
               <tr>
-                ${dChunk.map(() => Array.from({ length: periods }, (_, p) => `<th>${p + 1}</th>`).join('')).join('')}
+                ${buildPeriodSubheaders(dChunk)}
               </tr>
             </thead>
             <tbody>${rowsHtml}</tbody>

@@ -3977,9 +3977,11 @@ function openExportPreviewModal(defaultDocType = null) {
   ensureState(state);
   const es = state.exportSettings;
   const tabToDoc = { class: 'class', teacher: 'teacher', class_sheet: 'class_sheet', teacher_sheet: 'teacher_sheet', report: 'report', room: 'class' };
-  document.getElementById('epvDocType').value = defaultDocType || tabToDoc[state.m6Tab] || 'class';
+  const chosenDoc = defaultDocType || tabToDoc[state.m6Tab] || 'class';
+  document.getElementById('epvDocType').value = chosenDoc;
   document.getElementById('epvPageSize').value = es.pageSize || 'A4';
-  document.getElementById('epvOrientation').value = es.orientation || 'landscape';
+  const defaultOrient = (chosenDoc === 'class' || chosenDoc === 'teacher') ? 'portrait' : 'landscape';
+  document.getElementById('epvOrientation').value = defaultOrient;
   document.getElementById('epvFontSize').value = es.fontSize || 'medium';
   document.getElementById('epvTeacherDisplay').value = es.teacherDisplay || 'full';
   document.getElementById('epvColorMode').value = es.colorMode || 'color';
