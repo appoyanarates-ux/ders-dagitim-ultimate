@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'evrakplus-dd-pwa-v1.0.6';
+const CACHE_NAME = 'evrakplus-dd-pwa-v1.0.7';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -23,7 +23,15 @@ const STATIC_ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then((cache) => Promise.all(
+        STATIC_ASSETS.map((url) =>
+          fetch(new Request(url, { cache: 'reload' }))
+            .then((resp) => (resp && resp.ok ? cache.put(url, resp) : null))
+            .catch(() => null)
+        )
+      ))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -54,14 +62,32 @@ self.addEventListener('fetch', (event) => {
           }
           return resp;
         })
-        .catch(() => caches.match('./index.html'))
+        .catch(() => caches.match('./index.html', { ignoreSearch: true }))
     );
     return;
   }
 
-  // Statik dosyalar için Cache-first -> Network
+  // Kod ve stil dosyaları (.js, .css, .html, .webmanifest) için Network-first -> Cache
+  // Böylece cPanel / sunucu güncellemeleri asla eski önbellekte takılı kalmaz
+  const isCodeOrStyle = /\.(js|css|html|webmanifest)$/i.test(url.pathname);
+  if (isCodeOrStyle) {
+    event.respondWith(
+      fetch(req)
+        .then((resp) => {
+          if (resp && resp.status === 200 && resp.type === 'basic') {
+            const clone = resp.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(req, clone));
+          }
+          return resp;
+        })
+        .catch(() => caches.match(req, { ignoreSearch: true }))
+    );
+    return;
+  }
+
+  // Simge ve görseller için Cache-first -> Network
   event.respondWith(
-    caches.match(req).then((cached) => {
+    caches.match(req, { ignoreSearch: true }).then((cached) => {
       if (cached) return cached;
       return fetch(req).then((resp) => {
         if (resp && resp.status === 200 && resp.type === 'basic') {

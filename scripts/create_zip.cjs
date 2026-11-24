@@ -25,17 +25,21 @@ function crc32(buf) {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-function collectFiles(baseRoot, relPaths) {
+function collectFiles(baseRoot, relPaths, stripPrefix = '') {
   const entries = [];
+  const normStrip = stripPrefix ? stripPrefix.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '') + '/' : '';
   function walk(absPath, zipRel) {
     const stat = fs.statSync(absPath);
-    const posixName = zipRel.split(path.sep).join('/').replace(/^\/+/, '');
+    let posixName = zipRel.split(path.sep).join('/').replace(/^\/+/, '');
     if (stat.isDirectory()) {
       for (const child of fs.readdirSync(absPath)) {
         if (child === '__pycache__' || child === '.pytest_cache' || child === 'node_modules') continue;
         walk(path.join(absPath, child), posixName ? `${posixName}/${child}` : child);
       }
     } else if (stat.isFile()) {
+      if (normStrip && posixName.startsWith(normStrip)) {
+        posixName = posixName.slice(normStrip.length);
+      }
       entries.push({ name: posixName, data: fs.readFileSync(absPath) });
     }
   }
@@ -103,13 +107,23 @@ function buildZipBuffer(entries) {
 }
 
 if (require.main === module) {
-  const [outZip, ...inputs] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  let stripPrefix = '';
+  const filtered = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--strip-prefix' && args[i + 1]) {
+      stripPrefix = args[++i];
+    } else {
+      filtered.push(args[i]);
+    }
+  }
+  const [outZip, ...inputs] = filtered;
   if (!outZip || inputs.length === 0) {
-    console.error('Kullanım: node scripts/create_zip.cjs <hedef.zip> <dosya_veya_klasor...>');
+    console.error('Kullanım: node scripts/create_zip.cjs [--strip-prefix klasor] <hedef.zip> <dosya_veya_klasor...>');
     process.exit(1);
   }
   const root = path.resolve(__dirname, '..');
-  const entries = collectFiles(root, inputs);
+  const entries = collectFiles(root, inputs, stripPrefix);
   const buf = buildZipBuffer(entries);
   const outAbs = path.resolve(root, outZip);
   fs.mkdirSync(path.dirname(outAbs), { recursive: true });

@@ -35,7 +35,9 @@
     if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
       return;
     }
-    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+    navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' })
+      .then((reg) => { if (reg && typeof reg.update === 'function') reg.update().catch(() => {}); })
+      .catch(() => {});
   }
 
   function syncBottomNavActive(activeView, m6Tab) {

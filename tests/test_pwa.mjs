@@ -46,6 +46,7 @@ test('Mobil PWA: Manifest, gerçek PNG simgeler (180/192/512), Service Worker, i
     assert.ok(sw.includes(asset), `sw.js önbellek listesinde eksik: ${asset}`);
   }
   assert.ok(sw.includes('/wp-json/'), 'sw.js API isteklerini önbellek dışı bırakmalı');
+  assert.ok(sw.includes('isCodeOrStyle'), 'sw.js JS/CSS dosyaları için Network-First kullanmalı');
 
   // HTML mobil PWA meta etiketleri ve alt gezinme çubuğu
   const html = fs.readFileSync(path.join(rendererDir, 'index.html'), 'utf8');
