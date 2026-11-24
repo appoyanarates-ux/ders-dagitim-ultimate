@@ -2247,21 +2247,228 @@ function renderBulkTeacherRows() {
 function computeTeacherLoads() {
   const teachers = getCurrentTeachers();
   const map = {};
-  teachers.forEach((t) => { map[t.id] = { teacher: t, totalHours: 0, coursesSummary: {}, crossBranchHours: 0 }; });
+  teachers.forEach((t) => { map[t.id] = { teacher: t, totalHours: 0, coursesSummary: {}, crossBranchHours: 0, assignments: [] }; });
   getCurrentClasses().forEach((cls) => {
     (cls.courses || []).forEach((c) => {
       const hrs = Number(c.hours) || 0;
-      const addLoad = (tid) => {
+      const blocks = getCourseBlocks(c);
+      const addLoad = (tid, slot) => {
         if (!tid || !map[tid]) return;
+        const isCross = !isBranchMatchingCourse(map[tid].teacher.branch, c.name);
         map[tid].totalHours += hrs;
         map[tid].coursesSummary[c.name] = (map[tid].coursesSummary[c.name] || 0) + hrs;
-        if (!isBranchMatchingCourse(map[tid].teacher.branch, c.name)) map[tid].crossBranchHours += hrs;
+        if (isCross) map[tid].crossBranchHours += hrs;
+        map[tid].assignments.push({
+          classId: cls.id,
+          className: cls.name,
+          courseId: c.id,
+          courseCode: c.code || '',
+          courseName: c.name,
+          hours: hrs,
+          blocks,
+          slot,
+          splitGroups: Boolean(c.splitGroups),
+          isCross
+        });
       };
-      addLoad(c.teacherId);
-      if (c.splitGroups) addLoad(c.teacherId2);
+      addLoad(c.teacherId, 1);
+      if (c.splitGroups) addLoad(c.teacherId2, 2);
     });
   });
   return map;
+}
+
+let m4LoadSearchText = '';
+let m4LoadFilterMode = 'ALL';
+let m4ExpandedTeacherIds = new Set();
+let m4TransferContext = null;
+
+function getTeacherInitials(name) {
+  const parts = String(name || '?').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toLocaleUpperCase('tr-TR');
+  return (parts[0][0] + parts[parts.length - 1][0]).toLocaleUpperCase('tr-TR');
+}
+
+function openM4TransferModal(ctx) {
+  const teachers = getCurrentTeachers();
+  const loadMap = computeTeacherLoads();
+  const srcTeacher = teachers.find((t) => t.id === ctx.sourceTeacherId);
+  if (!srcTeacher) return;
+
+  m4TransferContext = ctx;
+  const isBulk = ctx.mode === 'bulk';
+  const titleEl = document.getElementById('m4TransferTitle');
+  const subEl = document.getElementById('m4TransferSubtitle');
+  const srcBox = document.getElementById('m4TransferSourceBox');
+  const targetSel = document.getElementById('m4TransferTargetSelect');
+  const unassignBtn = document.getElementById('btnM4TransferUnassign');
+
+  if (titleEl) titleEl.textContent = isBulk ? 'Öğretmenin Tüm Derslerini Aktar' : 'Dersi Başka Öğretmene Aktar';
+  if (subEl) subEl.textContent = isBulk
+    ? 'Bu öğretmendeki tüm dersler seçeceğiniz yeni öğretmene topluca devredilir'
+    : 'Seçili şube dersini yeni öğretmene anında devredin';
+
+  const srcLoad = loadMap[srcTeacher.id] || { totalHours: 0, assignments: [] };
+  const transferHours = isBulk ? srcLoad.totalHours : (Number(ctx.hours) || 0);
+
+  if (srcBox) {
+    if (isBulk) {
+      srcBox.innerHTML = `
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <div class="text-[11px] font-semibold text-indigo-700 uppercase tracking-wide">Kaynak Öğretmen (Toplu Aktarım)</div>
+            <div class="text-sm font-bold text-slate-900 mt-0.5">${escapeHtml(srcTeacher.name)}</div>
+            <div class="text-[11px] text-slate-500">${escapeHtml(srcTeacher.branch)} · ${srcLoad.assignments.length} ders</div>
+          </div>
+          <span class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-xs font-bold">${transferHours} sa</span>
+        </div>
+      `;
+    } else {
+      srcBox.innerHTML = `
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <div class="text-[11px] font-semibold text-indigo-700 uppercase tracking-wide">Aktarılacak Ders</div>
+            <div class="text-sm font-bold text-slate-900 mt-0.5">
+              <span class="px-1.5 py-0.5 rounded bg-indigo-600 text-white text-[11px] mr-1.5">${escapeHtml(ctx.className)}</span>
+              ${escapeHtml(ctx.courseName)}
+            </div>
+            <div class="text-[11px] text-slate-500 mt-0.5">Mevcut Öğretmen: <strong>${escapeHtml(srcTeacher.name)}</strong> (${srcLoad.totalHours}/${srcTeacher.maxHours} sa)${ctx.slot === 2 ? ' · 2. Grup' : ''}</div>
+          </div>
+          <span class="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-indigo-700 text-xs font-bold shrink-0">${transferHours} sa</span>
+        </div>
+      `;
+    }
+  }
+
+  if (unassignBtn) {
+    unassignBtn.textContent = isBulk ? 'Tüm Atamalarını Kaldır' : 'Atamayı Kaldır (Boşa Çıkar)';
+  }
+
+  const candidates = teachers.filter((t) => t.id !== srcTeacher.id);
+  const recommended = [];
+  const others = [];
+  candidates.forEach((t) => {
+    const matchMain = isBulk
+      ? t.branch === srcTeacher.branch
+      : (isBranchMatchingCourse(t.branch, ctx.courseName) || (window.DersDutyModule && window.DersDutyModule.doesTeacherExtraMatchCourse(t, ctx.courseName, ctx.courseCode || '')));
+    if (matchMain) recommended.push(t); else others.push(t);
+  });
+  const byLoad = (a, b) => (loadMap[a.id] ? loadMap[a.id].totalHours : 0) - (loadMap[b.id] ? loadMap[b.id].totalHours : 0);
+  recommended.sort(byLoad);
+  others.sort(byLoad);
+
+  const renderOpt = (t) => {
+    const cur = loadMap[t.id] ? loadMap[t.id].totalHours : 0;
+    const next = cur + transferHours;
+    const warn = next > t.maxHours ? ' ⚠ Aşım' : '';
+    return `<option value="${t.id}">${escapeHtml(t.name)} (${escapeHtml(t.branch)} · ${cur} → ${next} / ${t.maxHours} sa${warn})</option>`;
+  };
+
+  if (targetSel) {
+    targetSel.innerHTML = `<option value="">— Hedef Öğretmen Seçin —</option>`
+      + (recommended.length ? `<optgroup label="Aynı Branş / Ek Ders (Önerilen)">${recommended.map(renderOpt).join('')}</optgroup>` : '')
+      + (others.length ? `<optgroup label="Diğer Branşlar">${others.map(renderOpt).join('')}</optgroup>` : '');
+    if (recommended.length > 0) targetSel.value = recommended[0].id;
+  }
+
+  updateM4TransferPreview();
+  const modal = document.getElementById('m4TransferModal');
+  if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function closeM4TransferModal() {
+  m4TransferContext = null;
+  const modal = document.getElementById('m4TransferModal');
+  if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+}
+
+function updateM4TransferPreview() {
+  const previewEl = document.getElementById('m4TransferPreviewBox');
+  const targetSel = document.getElementById('m4TransferTargetSelect');
+  if (!previewEl || !targetSel || !m4TransferContext) return;
+
+  const targetId = targetSel.value;
+  if (!targetId) {
+    previewEl.classList.add('hidden');
+    return;
+  }
+
+  const teachers = getCurrentTeachers();
+  const loadMap = computeTeacherLoads();
+  const srcT = teachers.find((t) => t.id === m4TransferContext.sourceTeacherId);
+  const dstT = teachers.find((t) => t.id === targetId);
+  if (!srcT || !dstT) { previewEl.classList.add('hidden'); return; }
+
+  const srcCur = loadMap[srcT.id] ? loadMap[srcT.id].totalHours : 0;
+  const dstCur = loadMap[dstT.id] ? loadMap[dstT.id].totalHours : 0;
+  const hrs = m4TransferContext.mode === 'bulk' ? srcCur : (Number(m4TransferContext.hours) || 0);
+  const srcNext = Math.max(0, srcCur - hrs);
+  const dstNext = dstCur + hrs;
+  const dstOver = dstNext > dstT.maxHours;
+
+  previewEl.classList.remove('hidden');
+  previewEl.innerHTML = `
+    <div class="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Aktarım Sonrası Yük Önizlemesi</div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+      <div class="rounded-lg bg-white border border-slate-200 p-2.5">
+        <div class="text-[11px] font-bold text-slate-800 truncate">${escapeHtml(srcT.name)}</div>
+        <div class="text-xs mt-1"><span class="text-slate-400 line-through">${srcCur} sa</span> → <span class="font-bold text-emerald-700">${srcNext} / ${srcT.maxHours} sa</span></div>
+      </div>
+      <div class="rounded-lg bg-white border ${dstOver ? 'border-rose-300 bg-rose-50/40' : 'border-emerald-200 bg-emerald-50/30'} p-2.5">
+        <div class="text-[11px] font-bold text-slate-800 truncate">${escapeHtml(dstT.name)}</div>
+        <div class="text-xs mt-1"><span class="text-slate-400">${dstCur} sa</span> → <span class="font-bold ${dstOver ? 'text-rose-600' : 'text-indigo-700'}">${dstNext} / ${dstT.maxHours} sa</span></div>
+        ${dstOver ? `<div class="text-[10px] font-semibold text-rose-600 mt-0.5">Maksimum saat sınırı (+${dstNext - dstT.maxHours} sa) aşılacak</div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function executeM4Transfer(unassignOnly = false) {
+  if (!m4TransferContext) return;
+  const classes = getCurrentClasses();
+  const teachers = getCurrentTeachers();
+  const targetId = unassignOnly ? null : (document.getElementById('m4TransferTargetSelect')?.value || null);
+  if (!unassignOnly && !targetId) {
+    showToast('Lütfen hedef bir öğretmen seçin.');
+    return;
+  }
+
+  const dstTeacher = targetId ? teachers.find((t) => t.id === targetId) : null;
+  let movedCount = 0;
+
+  if (m4TransferContext.mode === 'bulk') {
+    const srcId = m4TransferContext.sourceTeacherId;
+    classes.forEach((cls) => {
+      (cls.courses || []).forEach((c) => {
+        if (c.teacherId === srcId) { c.teacherId = targetId; movedCount++; }
+        if (c.splitGroups && c.teacherId2 === srcId) { c.teacherId2 = targetId; movedCount++; }
+      });
+    });
+  } else {
+    const cls = classes.find((x) => x.id === m4TransferContext.classId);
+    const c = cls && (cls.courses || []).find((x) => x.id === m4TransferContext.courseId);
+    if (c) {
+      if (m4TransferContext.slot === 2) c.teacherId2 = targetId;
+      else c.teacherId = targetId;
+      movedCount = 1;
+    }
+  }
+
+  if (movedCount > 0) {
+    if (targetId) m4ExpandedTeacherIds.add(targetId);
+    saveState();
+    closeM4TransferModal();
+    renderMenu4();
+    showToast(
+      unassignOnly
+        ? `${movedCount} ders ataması kaldırıldı (boşa çıkarıldı)`
+        : `${movedCount} ders ${dstTeacher ? dstTeacher.name : 'yeni öğretmene'} aktarıldı`
+    );
+  } else {
+    closeM4TransferModal();
+  }
 }
 
 function buildTeacherSelectHtml(selectedTid, courseName, teachers, loadMap, dataAttrs) {
@@ -2386,20 +2593,166 @@ function renderMenu4() {
   }
 
   const loadListEl = document.getElementById('m4TeacherLoadList');
-  loadListEl.innerHTML = teachers.length === 0
-    ? `<div class="py-6 text-center text-xs text-slate-400">Henüz öğretmen yok.</div>`
-    : teachers.map((t) => {
-        const info = loadMap[t.id];
-        const ratio = Math.min(100, Math.round((info.totalHours / Math.max(1, t.maxHours)) * 100));
-        const isOver = info.totalHours > t.maxHours;
-        const barColor = isOver ? 'bg-rose-500' : (info.totalHours >= t.minHours ? 'bg-emerald-500' : 'bg-indigo-500');
-        const courseChips = Object.entries(info.coursesSummary).map(([cn, h]) => `<span class="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px]">${escapeHtml(cn)} (${h}s)</span>`).join('');
-        return `<div class="p-3 rounded-xl border ${isOver ? 'border-rose-300 bg-rose-50/40' : 'border-slate-200 bg-slate-50/40'} space-y-1.5">
-          <div class="flex items-center justify-between gap-2"><div class="min-w-0"><div class="text-xs font-bold text-slate-900 truncate">${escapeHtml(t.name)}</div><div class="text-[10px] text-slate-500 truncate">${escapeHtml(t.branch)}${info.crossBranchHours > 0 ? ` · <span class="text-teal-700 font-semibold">${info.crossBranchHours}s branş dışı</span>` : ''}</div></div><span class="shrink-0 text-xs font-bold ${isOver ? 'text-rose-600' : 'text-slate-800'}">${info.totalHours} / ${t.maxHours} sa</span></div>
-          <div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden"><div class="h-full ${barColor} rounded-full" style="width: ${ratio}%;"></div></div>
-          ${courseChips ? `<div class="flex flex-wrap gap-1 pt-0.5">${courseChips}</div>` : `<div class="text-[10px] text-slate-400">Henüz ders atanmadı</div>`}
-        </div>`;
-      }).join('');
+  const loadCountBadge = document.getElementById('m4LoadCountBadge');
+  const lq = (m4LoadSearchText || '').trim().toLocaleLowerCase('tr-TR');
+
+  const filteredTeachers = teachers.filter((t) => {
+    const info = loadMap[t.id] || { totalHours: 0, assignments: [] };
+    if (m4LoadFilterMode === 'OVER' && !(info.totalHours > t.maxHours)) return false;
+    if (m4LoadFilterMode === 'ACTIVE' && info.totalHours === 0) return false;
+    if (m4LoadFilterMode === 'EMPTY' && info.totalHours > 0) return false;
+    if (lq) {
+      const courseNames = info.assignments.map((a) => `${a.className} ${a.courseName}`).join(' ');
+      const hay = `${t.name} ${t.branch} ${courseNames}`.toLocaleLowerCase('tr-TR');
+      if (!hay.includes(lq)) return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    const la = loadMap[a.id] ? loadMap[a.id].totalHours : 0;
+    const lb = loadMap[b.id] ? loadMap[b.id].totalHours : 0;
+    const oa = la > a.maxHours ? 1 : 0;
+    const ob = lb > b.maxHours ? 1 : 0;
+    if (oa !== ob) return ob - oa; // Yük aşanlar en üstte
+    if (lb !== la) return lb - la;
+    return a.name.localeCompare(b.name, 'tr');
+  });
+
+  if (loadCountBadge) loadCountBadge.textContent = `${filteredTeachers.length} / ${teachers.length}`;
+
+  if (teachers.length === 0) {
+    loadListEl.innerHTML = `<div class="py-6 text-center text-xs text-slate-400">Henüz öğretmen eklenmedi.</div>`;
+  } else if (filteredTeachers.length === 0) {
+    loadListEl.innerHTML = `<div class="py-6 text-center text-xs text-slate-400">Filtreye uyan öğretmen bulunamadı.</div>`;
+  } else {
+    loadListEl.innerHTML = filteredTeachers.map((t) => {
+      const info = loadMap[t.id] || { totalHours: 0, coursesSummary: {}, crossBranchHours: 0, assignments: [] };
+      const maxH = Math.max(1, Number(t.maxHours) || 30);
+      const minH = Number(t.minHours) || 1;
+      const ratio = Math.min(100, Math.round((info.totalHours / maxH) * 100));
+      const isOver = info.totalHours > maxH;
+      const isEmpty = info.totalHours === 0;
+      const isBelowMin = !isEmpty && info.totalHours < minH;
+      const remaining = maxH - info.totalHours;
+      const isExpanded = m4ExpandedTeacherIds.has(t.id);
+
+      const avatarCls = isOver
+        ? 'bg-rose-600 text-white'
+        : isEmpty
+          ? 'bg-slate-200 text-slate-600'
+          : isBelowMin
+            ? 'bg-amber-500 text-white'
+            : 'bg-indigo-600 text-white';
+      const barColor = isOver ? 'bg-rose-500' : (isEmpty ? 'bg-slate-300' : (isBelowMin ? 'bg-amber-400' : 'bg-emerald-500'));
+      const statusBadge = isOver
+        ? `<span class="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[9px] font-bold">+${info.totalHours - maxH}s Aşım</span>`
+        : isEmpty
+          ? `<span class="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-semibold">Derssiz</span>`
+          : `<span class="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-semibold">${remaining > 0 ? `+${remaining}s boş` : 'Tam dolu'}</span>`;
+
+      const collapsedChips = info.assignments.slice(0, 4).map((a) =>
+        `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] text-slate-700"><strong class="text-indigo-700">${escapeHtml(a.className)}</strong> ${escapeHtml(a.courseName)} <span class="text-slate-400">(${a.hours}s)</span></span>`
+      ).join('') + (info.assignments.length > 4 ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-semibold">+${info.assignments.length - 4} ders</span>` : '');
+
+      const expandedRows = info.assignments.length === 0
+        ? `<div class="py-3 text-center text-[11px] text-slate-400">Bu öğretmene henüz ders atanmamış.</div>`
+        : info.assignments.map((a) => `
+          <div class="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg bg-white border border-slate-200/80 hover:border-indigo-300 transition">
+            <div class="min-w-0 flex items-center gap-1.5">
+              <span class="shrink-0 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px]">${escapeHtml(a.className)}</span>
+              <div class="min-w-0">
+                <div class="text-[11px] font-semibold text-slate-800 truncate">${escapeHtml(a.courseName)}${a.slot === 2 ? ' <span class="text-[9px] text-indigo-600">(2.Grup)</span>' : ''}</div>
+                <div class="text-[10px] text-slate-400">${a.hours} sa · (${a.blocks.join('+')})${a.isCross ? ' · <span class="text-teal-700 font-semibold">Branş dışı</span>' : ''}</div>
+              </div>
+            </div>
+            <button type="button"
+              class="m4-transfer-one shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white text-[10px] font-bold transition"
+              data-src-tid="${t.id}" data-cls-id="${a.classId}" data-cls-name="${escapeHtml(a.className)}"
+              data-crs-id="${a.courseId}" data-crs-code="${escapeHtml(a.courseCode)}" data-crs-name="${escapeHtml(a.courseName)}"
+              data-hrs="${a.hours}" data-slot="${a.slot}" title="Bu dersi başka öğretmene aktar">
+              <i data-lucide="arrow-left-right" class="w-3 h-3"></i> Aktar
+            </button>
+          </div>
+        `).join('');
+
+      return `
+        <div class="rounded-xl border transition-all ${isOver ? 'border-rose-300 bg-rose-50/40' : (isExpanded ? 'border-indigo-300 bg-indigo-50/20 shadow-xs' : 'border-slate-200 bg-slate-50/50 hover:border-slate-300')}">
+          <button type="button" data-toggle-tid="${t.id}" class="m4-load-toggle w-full text-left p-3 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-8 h-8 rounded-lg ${avatarCls} flex items-center justify-center text-[11px] font-bold shrink-0 shadow-xs">${escapeHtml(getTeacherInitials(t.name))}</div>
+                <div class="min-w-0">
+                  <div class="text-xs font-bold text-slate-900 truncate">${escapeHtml(t.name)}</div>
+                  <div class="text-[10px] text-slate-500 truncate">${escapeHtml(t.branch)}${info.crossBranchHours > 0 ? ` · <span class="text-teal-700 font-semibold">${info.crossBranchHours}s branş dışı</span>` : ''}</div>
+                </div>
+              </div>
+              <div class="flex flex-col items-end shrink-0 gap-0.5">
+                <div class="flex items-center gap-1">
+                  <span class="text-xs font-extrabold ${isOver ? 'text-rose-600' : 'text-slate-900'}">${info.totalHours}<span class="text-[10px] font-medium text-slate-400">/${maxH}s</span></span>
+                  <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" class="w-3.5 h-3.5 text-slate-400"></i>
+                </div>
+                ${statusBadge}
+              </div>
+            </div>
+            <div class="w-full h-1.5 bg-slate-200/80 rounded-full overflow-hidden">
+              <div class="h-full ${barColor} rounded-full transition-all" style="width: ${ratio}%;"></div>
+            </div>
+            ${!isExpanded ? (collapsedChips ? `<div class="flex flex-wrap gap-1 pt-0.5">${collapsedChips}</div>` : `<div class="text-[10px] text-slate-400">Henüz ders atanmadı</div>`) : ''}
+          </button>
+          ${isExpanded ? `
+            <div class="px-3 pb-3 pt-1 border-t border-slate-200/70 space-y-2">
+              <div class="space-y-1.5">${expandedRows}</div>
+              <div class="flex items-center justify-between gap-1.5 pt-1.5 border-t border-slate-200/60">
+                <button type="button" data-filter-tname="${escapeHtml(t.name)}" class="m4-filter-teacher inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-[10px] font-semibold text-slate-700 transition">
+                  <i data-lucide="filter" class="w-3 h-3"></i> Tabloda Göster
+                </button>
+                ${info.assignments.length > 0 ? `
+                  <button type="button" data-bulk-tid="${t.id}" class="m4-transfer-bulk inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold shadow-xs transition">
+                    <i data-lucide="repeat" class="w-3 h-3"></i> Tümünü Aktar (${info.assignments.length})
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    loadListEl.querySelectorAll('.m4-load-toggle').forEach((btn) => btn.addEventListener('click', () => {
+      const tid = btn.dataset.toggleTid;
+      if (m4ExpandedTeacherIds.has(tid)) m4ExpandedTeacherIds.delete(tid);
+      else m4ExpandedTeacherIds.add(tid);
+      renderMenu4();
+    }));
+
+    loadListEl.querySelectorAll('.m4-transfer-one').forEach((btn) => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openM4TransferModal({
+        mode: 'single',
+        sourceTeacherId: btn.dataset.srcTid,
+        classId: btn.dataset.clsId,
+        className: btn.dataset.clsName,
+        courseId: btn.dataset.crsId,
+        courseCode: btn.dataset.crsCode,
+        courseName: btn.dataset.crsName,
+        hours: Number(btn.dataset.hrs) || 0,
+        slot: Number(btn.dataset.slot) || 1
+      });
+    }));
+
+    loadListEl.querySelectorAll('.m4-transfer-bulk').forEach((btn) => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openM4TransferModal({ mode: 'bulk', sourceTeacherId: btn.dataset.bulkTid });
+    }));
+
+    loadListEl.querySelectorAll('.m4-filter-teacher').forEach((btn) => btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const name = btn.dataset.filterTname || '';
+      state.m4Search = name;
+      const searchEl = document.getElementById('m4Search');
+      if (searchEl) searchEl.value = name;
+      renderMenu4();
+    }));
+  }
 
   const roomListEl = document.getElementById('m4RoomList');
   if (rooms.length === 0) {
@@ -5105,6 +5458,27 @@ function bindEvents() {
   document.getElementById('m4ClassFilter').addEventListener('change', (e) => { state.m4ClassFilter = e.target.value; saveState(); renderMenu4(); });
   document.getElementById('m4OnlyUnassigned').addEventListener('change', (e) => { state.m4OnlyUnassigned = e.target.checked; renderMenu4(); });
   document.getElementById('m4Search').addEventListener('input', (e) => { state.m4Search = e.target.value; renderMenu4(); });
+  const m4LoadSearchEl = document.getElementById('m4LoadSearch');
+  if (m4LoadSearchEl) {
+    m4LoadSearchEl.addEventListener('input', (e) => { m4LoadSearchText = e.target.value; renderMenu4(); });
+  }
+  document.querySelectorAll('.m4-lf-btn').forEach((btn) => btn.addEventListener('click', () => {
+    m4LoadFilterMode = btn.dataset.loadFilter || 'ALL';
+    document.querySelectorAll('.m4-lf-btn').forEach((b) => {
+      const act = b.dataset.loadFilter === m4LoadFilterMode;
+      b.className = `m4-lf-btn px-2 py-1 rounded-md text-[10px] font-semibold transition ${act ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`;
+    });
+    renderMenu4();
+  }));
+  const m4TrModal = document.getElementById('m4TransferModal');
+  if (m4TrModal) {
+    document.getElementById('btnCloseM4Transfer')?.addEventListener('click', closeM4TransferModal);
+    document.getElementById('btnCancelM4Transfer')?.addEventListener('click', closeM4TransferModal);
+    m4TrModal.addEventListener('click', (e) => { if (e.target === m4TrModal) closeM4TransferModal(); });
+    document.getElementById('m4TransferTargetSelect')?.addEventListener('change', updateM4TransferPreview);
+    document.getElementById('btnConfirmM4Transfer')?.addEventListener('click', () => executeM4Transfer(false));
+    document.getElementById('btnM4TransferUnassign')?.addEventListener('click', () => executeM4Transfer(true));
+  }
   document.getElementById('btnM4AutoMatch').addEventListener('click', () => {
     const teachers = getCurrentTeachers(), classes = getCurrentClasses();
     if (!teachers.length || !classes.length) { showToast('Önce şube, ders ve öğretmen oluşturun'); return; }
