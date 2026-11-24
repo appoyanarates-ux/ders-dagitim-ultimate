@@ -2493,7 +2493,17 @@ function validateBeforeSolve(cfg) {
 }
 
 function inferDiagnosticNav(diag) {
-  if (diag && diag.nav) return { nav: diag.nav, linkLabel: diag.linkLabel || 'Düzeltmek İçin Git →' };
+  const extraLinks = (diag && Array.isArray(diag.links))
+    ? diag.links.filter((l) => l && l.nav && l.label)
+    : [];
+  if (diag && diag.nav) {
+    return {
+      nav: diag.nav,
+      linkLabel: diag.linkLabel || 'Düzeltmek İçin Git →',
+      category: diag.category || null,
+      links: extraLinks
+    };
+  }
   const msg = String((diag && diag.message) || diag || '');
   const classes = getCurrentClasses();
   const teachers = getCurrentTeachers();
@@ -2502,43 +2512,52 @@ function inferDiagnosticNav(diag) {
   for (const cls of classes) {
     if (cls.name && msg.includes(cls.name)) {
       if (/öğretmen atanmamış|atanmamış/i.test(msg)) {
-        return { nav: { view: 'menu4', classId: cls.id }, linkLabel: `${cls.name} Ders Atamasına Git →` };
+        return { nav: { view: 'menu4', classId: cls.id }, linkLabel: `${cls.name} Ders Atamasına Git →`, category: diag && diag.category, links: extraLinks };
       }
       if (/blok|ders saati/i.test(msg)) {
-        return { nav: { view: 'menu2', classId: cls.id }, linkLabel: `${cls.name} Bloklarına Git →` };
+        return { nav: { view: 'menu2', classId: cls.id }, linkLabel: `${cls.name} Bloklarına Git →`, category: diag && diag.category, links: extraLinks };
       }
-      return { nav: { view: 'menu4', classId: cls.id }, linkLabel: `${cls.name} İçin Git →` };
+      return { nav: { view: 'menu4', classId: cls.id }, linkLabel: `${cls.name} İçin Git →`, category: diag && diag.category, links: extraLinks };
     }
   }
   // Öğretmen eşleşmesi
   for (const t of teachers) {
     if (t.name && msg.includes(t.name)) {
-      return { nav: { view: 'menu3', teacherId: t.id }, linkLabel: `${t.name} Ayarlarına Git →` };
+      return { nav: { view: 'menu3', teacherId: t.id }, linkLabel: `${t.name} Ayarlarına Git →`, category: diag && diag.category, links: extraLinks };
     }
   }
   if (/öğle|zil|kapalı gün|slot|zaman/i.test(msg)) {
-    return { nav: { view: 'menu1' }, linkLabel: 'Zaman Çizelgesine Git →' };
+    return { nav: { view: 'menu1' }, linkLabel: 'Zaman Çizelgesine Git →', category: diag && diag.category, links: extraLinks };
   }
   if (/derslik|mekan|laboratuvar|salon/i.test(msg)) {
-    return { nav: { view: 'menu4' }, linkLabel: 'Özel Dersliklere Git →' };
+    return { nav: { view: 'menu4', focus: 'rooms' }, linkLabel: 'Özel Dersliklere Git →', category: diag && diag.category, links: extraLinks };
   }
   if (/öğretmen/i.test(msg)) {
-    return { nav: { view: 'menu3' }, linkLabel: 'Öğretmenlere Git →' };
+    return { nav: { view: 'menu3' }, linkLabel: 'Öğretmenlere Git →', category: diag && diag.category, links: extraLinks };
   }
-  return { nav: { view: 'menu4' }, linkLabel: 'Ders Atamaya Git →' };
+  return { nav: { view: 'menu4' }, linkLabel: 'Ders Atamaya Git →', category: diag && diag.category, links: extraLinks };
 }
 
 function navigateFromWarningLink(nav) {
   if (!nav || !nav.view) return;
   state.activeView = nav.view;
-  if (nav.view === 'menu3' && nav.teacherId) state.selectedTeacherId = nav.teacherId;
+  if (nav.view === 'menu2' && nav.classId) {
+    state.selectedClassId = nav.classId;
+    state.gradeFilter = 'ALL';
+  }
+  if (nav.view === 'menu3' && nav.teacherId) {
+    state.selectedTeacherId = nav.teacherId;
+    state.teacherSearch = '';
+    state.teacherBranchFilter = 'ALL';
+    const tSearch = document.getElementById('m3TeacherSearch');
+    if (tSearch) tSearch.value = '';
+  }
   if (nav.view === 'menu4') {
     if (nav.classId) state.m4ClassFilter = nav.classId;
-    if (nav.search !== undefined) {
-      state.m4Search = nav.search;
-      const sInp = document.getElementById('m4Search');
-      if (sInp) sInp.value = nav.search;
-    }
+    const nextSearch = nav.search !== undefined ? nav.search : '';
+    state.m4Search = nextSearch;
+    const sInp = document.getElementById('m4Search');
+    if (sInp) sInp.value = nextSearch;
   }
   if (nav.view === 'menu6') {
     if (nav.tab) state.m6Tab = nav.tab;
@@ -2546,6 +2565,14 @@ function navigateFromWarningLink(nav) {
   }
   saveState();
   renderAll();
+  if (nav.view === 'menu4' && nav.focus === 'rooms') {
+    const roomEl = document.getElementById('m4RoomList');
+    if (roomEl && typeof roomEl.scrollIntoView === 'function') {
+      roomEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      roomEl.classList.add('ring-2', 'ring-rose-400', 'rounded-xl');
+      setTimeout(() => roomEl.classList.remove('ring-2', 'ring-rose-400', 'rounded-xl'), 2200);
+    }
+  }
 }
 
 function formatFriendlyStatus(status) {
@@ -3335,15 +3362,30 @@ function renderMenu5() {
     const diags = Array.isArray(err.diagnostics) ? err.diagnostics : [];
     resolvedDiags = diags.slice(0, 20).map((d) => {
       const info = inferDiagnosticNav(d);
-      return { message: (d && d.message) || String(d), nav: info.nav, linkLabel: info.linkLabel };
+      return {
+        message: (d && d.message) || String(d),
+        category: info.category || (d && d.category) || null,
+        nav: info.nav,
+        linkLabel: info.linkLabel,
+        links: info.links || []
+      };
     });
     errBanner = `
       <div class="rounded-xl bg-rose-50 border border-rose-200 p-4 text-xs text-rose-900 space-y-2">
-        <div class="font-bold">${escapeHtml(formatFriendlyStatus(err.status))}: ${escapeHtml(err.message)}</div>
+        <div class="font-bold flex items-start gap-2">
+          <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-600 shrink-0 mt-0.5"></i>
+          <span>${escapeHtml(formatFriendlyStatus(err.status))}: ${escapeHtml(err.message)}</span>
+        </div>
         ${resolvedDiags.length ? `<div class="space-y-1.5 pt-1">${resolvedDiags.map((d, idx) => `
-          <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/80 border border-rose-200/80 px-2.5 py-1.5">
-            <span>• ${escapeHtml(d.message)}</span>
-            <button type="button" data-diag-idx="${idx}" class="m5-diag-link shrink-0 px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold transition">${escapeHtml(d.linkLabel)}</button>
+          <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/90 border border-rose-200/80 px-3 py-2">
+            <div class="space-y-0.5 min-w-0 flex-1">
+              ${d.category ? `<span class="inline-block text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200 mr-1.5">${escapeHtml(d.category)}</span>` : ''}
+              <span class="text-slate-800">${escapeHtml(d.message)}</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+              <button type="button" data-diag-idx="${idx}" class="m5-diag-link px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold transition">${escapeHtml(d.linkLabel)}</button>
+              ${(d.links || []).map((lnk, lIdx) => `<button type="button" data-diag-idx="${idx}" data-sub-idx="${lIdx}" class="m5-diag-sublink px-2.5 py-1 rounded-md bg-white hover:bg-rose-100 text-rose-800 border border-rose-300 text-[11px] font-semibold transition">${escapeHtml(lnk.label)}</button>`).join('')}
+            </div>
           </div>
         `).join('')}</div>` : ''}
         ${state.solution ? '<div class="text-[11px] text-rose-700 pt-1">Önceki geçerli ders programınız korundu.</div>' : ''}
@@ -3403,6 +3445,11 @@ function renderMenu5() {
   statusCard.querySelectorAll('.m5-diag-link').forEach((btn) => btn.addEventListener('click', () => {
     const item = resolvedDiags[Number(btn.dataset.diagIdx)];
     if (item && item.nav) navigateFromWarningLink(item.nav);
+  }));
+  statusCard.querySelectorAll('.m5-diag-sublink').forEach((btn) => btn.addEventListener('click', () => {
+    const item = resolvedDiags[Number(btn.dataset.diagIdx)];
+    const sub = item && item.links && item.links[Number(btn.dataset.subIdx)];
+    if (sub && sub.nav) navigateFromWarningLink(sub.nav);
   }));
   statusCard.querySelectorAll('.m5-unplaced-link').forEach((btn) => btn.addEventListener('click', () => {
     const u = state.solution && state.solution.unplaced && state.solution.unplaced[Number(btn.dataset.unpIdx)];

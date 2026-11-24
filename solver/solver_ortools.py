@@ -95,6 +95,738 @@ def assign_pool_rooms(
                 pl["room_id"] = assigned
 
 
+DEFAULT_DAY_NAMES = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
+
+
+def _get_day_name(time_grid: Dict[str, Any], day_index: int) -> str:
+    days = time_grid.get("days")
+    if isinstance(days, list):
+        for item in days:
+            if isinstance(item, dict) and int(item.get("index", -1)) == day_index and item.get("name"):
+                return str(item["name"])
+    if 0 <= day_index < len(DEFAULT_DAY_NAMES):
+        return DEFAULT_DAY_NAMES[day_index]
+    return f"Gün {day_index + 1}"
+
+
+def diagnose_infeasibility(
+    *,
+    config: Dict[str, Any],
+    time_grid: Dict[str, Any],
+    num_days: int,
+    periods_per_day: int,
+    blocked: Set[Tuple[int, int]],
+    common_elective: Set[Tuple[int, int]],
+    lunch_after: int,
+    long_break_after: int,
+    intervals: Dict[str, List[Tuple[int, int]]],
+    class_map: Dict[str, Dict[str, Any]],
+    teacher_map: Dict[str, Dict[str, Any]],
+    room_map: Dict[str, Dict[str, Any]],
+    rooms_by_type: Dict[str, List[Dict[str, Any]]],
+    assignments: List[Dict[str, Any]],
+    assignments_by_id: Dict[str, Dict[str, Any]],
+    teacher_unavail: Dict[str, Set[Tuple[int, int]]],
+    resolved_fixed: Dict[Tuple[str, int], Dict[str, Any]],
+    enforce_common_exclusivity: bool,
+    travel_min: int,
+    max_diag_time_sec: float = 8.0,
+) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+    """
+    CP-SAT AddAssumptions + SufficientAssumptionsForInfeasibility kullanarak
+    çözülemezliğin (INFEASIBLE) tam kaynağını (UNSAT çekirdeğini) tespit eder.
+    """
+    emit_progress("diagnosing", "Çelişki kaynağı analiz ediliyor")
+    dmodel = cp_model.CpModel()
+    assumptions: List[cp_model.IntVar] = []
+    assumption_meta: Dict[int, Dict[str, Any]] = {}
+
+    def make_assumption(name: str, meta: Dict[str, Any]) -> cp_model.IntVar:
+        v = dmodel.NewBoolVar(name)
+        assumptions.append(v)
+        assumption_meta[v.Index()] = meta
+        return v
+
+    class_day_vars: Dict[Tuple[str, int], List[Tuple[int, int, cp_model.IntVar, int]]] = defaultdict(list)
+    teacher_day_vars: Dict[Tuple[str, int], List[Tuple[int, int, cp_model.IntVar, int]]] = defaultdict(list)
+    teacher_day_period_vars: Dict[Tuple[str, int, int], List[cp_model.IntVar]] = defaultdict(list)
+    room_day_vars: Dict[Tuple[str, int], List[Tuple[int, int, cp_model.IntVar, int]]] = defaultdict(list)
+    room_type_day_vars: Dict[Tuple[str, int], List[Tuple[int, int, cp_model.IntVar, int]]] = defaultdict(list)
+    asgn_day_vars: Dict[Tuple[str, int], List[cp_model.IntVar]] = defaultdict(list)
+    teacher_building_day_vars: Dict[Tuple[str, int], List[Tuple[int, int, str, cp_model.IntVar]]] = defaultdict(list)
+    class_common_slot_vars: Dict[Tuple[str, int, int], List[cp_model.IntVar]] = defaultdict(list)
+    class_common_hours: Dict[str, int] = defaultdict(int)
+
+    teacher_forbidden_vars: Dict[str, List[cp_model.IntVar]] = defaultdict(list)
+    non_elective_in_common_vars: List[cp_model.IntVar] = []
+
+    asgn_place_assumptions: Dict[str, cp_model.IntVar] = {}
+
+    for asgn in assignments:
+        aid = asgn["assignment_id"]
+        cid = asgn["class_id"]
+        cls = class_map[cid]
+        cls_shift = cls.get("shift") or "full_day"
+        t_ids = list(asgn.get("teacher_ids") or [])
+        base_room_id = asgn.get("room_id")
+        room_type = asgn.get("room_type") or "standard"
+        use_common = bool(asgn.get("use_common_elective_slot"))
+        blocks = [int(b) for b in (asgn.get("blocks") or [])]
+        if use_common:
+            class_common_hours[cid] += sum(blocks)
+
+        a_place = make_assumption(
+            f"a_place_{aid}",
+            {"kind": "asgn_place", "priority": 2, "assignment_id": aid},
+        )
+        asgn_place_assumptions[aid] = a_place
+
+        for b_idx, blen in enumerate(blocks):
+            key = (aid, b_idx)
+            fa_entry = resolved_fixed.get(key)
+            eff_room_id = (fa_entry.get("room_id") if fa_entry and fa_entry.get("room_id") else base_room_id)
+
+            school_valid, _ = compute_valid_starts_for_block(
+                length=blen,
+                num_days=num_days,
+                periods_per_day=periods_per_day,
+                blocked=blocked,
+                common_elective=common_elective,
+                use_common_elective=use_common,
+                enforce_common_elective_exclusivity=False,
+                lunch_after=lunch_after,
+                long_break_after=long_break_after,
+                class_shift=cls_shift,
+                teacher_unavail_sets=[],
+            )
+            if fa_entry is not None:
+                fslot = (fa_entry["day_index"], fa_entry["start_period"])
+                if fslot not in school_valid:
+                    school_valid.append(fslot)
+
+            if not school_valid:
+                continue
+
+            blk_building = None
+            if eff_room_id and eff_room_id in room_map and room_map[eff_room_id].get("building"):
+                blk_building = str(room_map[eff_room_id]["building"]).strip()
+            elif cls.get("building"):
+                blk_building = str(cls["building"]).strip()
+
+            cands_vars: List[cp_model.IntVar] = []
+            fixed_var: Optional[cp_model.IntVar] = None
+
+            for d, p in school_valid:
+                var = dmodel.NewBoolVar(f"dx_{aid}_{b_idx}_{d}_{p}")
+                cands_vars.append(var)
+                if fa_entry is not None and d == fa_entry["day_index"] and p == fa_entry["start_period"]:
+                    fixed_var = var
+
+                span_s, span_e = get_block_physical_span(intervals, cls_shift, p, blen)
+                class_day_vars[(cid, d)].append((span_s, span_e, var, blen))
+                asgn_day_vars[(aid, d)].append(var)
+
+                if use_common:
+                    for k in range(blen):
+                        class_common_slot_vars[(cid, d, p + k)].append(var)
+                elif enforce_common_exclusivity:
+                    if any((d, p + k) in common_elective for k in range(blen)):
+                        non_elective_in_common_vars.append(var)
+
+                for tid in t_ids:
+                    teacher_day_vars[(tid, d)].append((span_s, span_e, var, blen))
+                    if travel_min > 0 and blk_building:
+                        teacher_building_day_vars[(tid, d)].append((span_s, span_e, blk_building, var))
+                    if any((d, p + k) in teacher_unavail[tid] for k in range(blen)):
+                        teacher_forbidden_vars[tid].append(var)
+                    for k in range(blen):
+                        teacher_day_period_vars[(tid, d, p + k)].append(var)
+
+                if eff_room_id:
+                    room_day_vars[(eff_room_id, d)].append((span_s, span_e, var, blen))
+                elif room_type != "standard" and rooms_by_type.get(room_type):
+                    room_type_day_vars[(room_type, d)].append((span_s, span_e, var, blen))
+
+            # Blok tam bir kez yerleşir (atama varsayımına bağlı)
+            dmodel.Add(sum(cands_vars) == 1).OnlyEnforceIf(a_place)
+            dmodel.Add(sum(cands_vars) <= 1)
+
+            if fa_entry is not None and fixed_var is not None:
+                a_fix = make_assumption(
+                    f"a_fix_{aid}_{b_idx}",
+                    {
+                        "kind": "fixed",
+                        "priority": 1,
+                        "assignment_id": aid,
+                        "block_index": b_idx,
+                        "day_index": fa_entry["day_index"],
+                        "start_period": fa_entry["start_period"],
+                        "length": blen,
+                    },
+                )
+                dmodel.Add(fixed_var == 1).OnlyEnforceIf(a_fix)
+
+    # Öğretmen kapalı saatleri varsayımları
+    for tid, fvars in teacher_forbidden_vars.items():
+        if not fvars:
+            continue
+        a_tu = make_assumption(
+            f"a_tu_{tid}",
+            {"kind": "t_unavail", "priority": 1, "teacher_id": tid},
+        )
+        dmodel.Add(sum(fvars) == 0).OnlyEnforceIf(a_tu)
+
+    # Ortak seçmeli münhasırlık varsayımı
+    if non_elective_in_common_vars:
+        a_ce = make_assumption(
+            "a_common_excl",
+            {"kind": "common_excl", "priority": 1},
+        )
+        dmodel.Add(sum(non_elective_in_common_vars) == 0).OnlyEnforceIf(a_ce)
+
+    # Şube çakışması yok (şube bazında varsayım)
+    class_ov_assumptions: Dict[str, cp_model.IntVar] = {}
+    for (cid, _d), items in class_day_vars.items():
+        start_points = sorted({s for s, _, _, _ in items})
+        for t_pt in start_points:
+            covering = [v for s, e, v, _ in items if s <= t_pt < e]
+            if len(covering) > 1:
+                if cid not in class_ov_assumptions:
+                    class_ov_assumptions[cid] = make_assumption(
+                        f"a_cov_{cid}",
+                        {"kind": "c_overlap", "priority": 1, "class_id": cid},
+                    )
+                dmodel.Add(sum(covering) <= 1).OnlyEnforceIf(class_ov_assumptions[cid])
+
+    # Öğretmen çakışması yok (öğretmen bazında varsayım)
+    teacher_ov_assumptions: Dict[str, cp_model.IntVar] = {}
+    for (tid, _d), items in teacher_day_vars.items():
+        start_points = sorted({s for s, _, _, _ in items})
+        for t_pt in start_points:
+            covering = [v for s, e, v, _ in items if s <= t_pt < e]
+            if len(covering) > 1:
+                if tid not in teacher_ov_assumptions:
+                    teacher_ov_assumptions[tid] = make_assumption(
+                        f"a_tov_{tid}",
+                        {"kind": "t_overlap", "priority": 1, "teacher_id": tid},
+                    )
+                dmodel.Add(sum(covering) <= 1).OnlyEnforceIf(teacher_ov_assumptions[tid])
+
+    # Özel derslik kapasitesi (oda bazında varsayım)
+    room_assumptions: Dict[str, cp_model.IntVar] = {}
+    for (rid, _d), items in room_day_vars.items():
+        cap = int(room_map[rid].get("simultaneous_capacity") or 1)
+        start_points = sorted({s for s, _, _, _ in items})
+        for t_pt in start_points:
+            covering = [v for s, e, v, _ in items if s <= t_pt < e]
+            if len(covering) > cap:
+                if rid not in room_assumptions:
+                    room_assumptions[rid] = make_assumption(
+                        f"a_rm_{rid}",
+                        {"kind": "room_cap", "priority": 1, "room_id": rid},
+                    )
+                dmodel.Add(sum(covering) <= cap).OnlyEnforceIf(room_assumptions[rid])
+
+    # Özel derslik türü havuzu kapasitesi
+    rtype_assumptions: Dict[str, cp_model.IntVar] = {}
+    for (rtype, _d), items in room_type_day_vars.items():
+        pool = rooms_by_type.get(rtype) or []
+        total_cap = sum(int(r.get("simultaneous_capacity") or 1) for r in pool)
+        start_points = sorted({s for s, _, _, _ in items})
+        for t_pt in start_points:
+            covering = [v for s, e, v, _ in items if s <= t_pt < e]
+            if len(covering) > total_cap:
+                if rtype not in rtype_assumptions:
+                    rtype_assumptions[rtype] = make_assumption(
+                        f"a_rt_{rtype}",
+                        {"kind": "rtype_cap", "priority": 1, "room_type": rtype},
+                    )
+                dmodel.Add(sum(covering) <= total_cap).OnlyEnforceIf(rtype_assumptions[rtype])
+
+    # Aynı dersin günlük blok sayısı sınırı
+    for asgn in assignments:
+        aid = asgn["assignment_id"]
+        max_per_day = int(asgn.get("max_blocks_per_day") or 1)
+        if max_per_day <= 0:
+            continue
+        a_amd: Optional[cp_model.IntVar] = None
+        for d in range(num_days):
+            d_vars = asgn_day_vars.get((aid, d)) or []
+            if len(d_vars) > max_per_day:
+                if a_amd is None:
+                    a_amd = make_assumption(
+                        f"a_amd_{aid}",
+                        {"kind": "asgn_max_day", "priority": 1, "assignment_id": aid, "max_per_day": max_per_day},
+                    )
+                dmodel.Add(sum(d_vars) <= max_per_day).OnlyEnforceIf(a_amd)
+
+    # Öğretmen günlük maks saat, çalışılabilir gün, ardışık maks saat, pencere ve bina geçişi
+    is_double_shift = isinstance(time_grid.get("bell_schedule"), dict)
+    for tid, t in teacher_map.items():
+        max_daily = int(t.get("max_daily_hours") or periods_per_day)
+        max_consec = int(t.get("max_consecutive_hours") or 0)
+        max_gaps_day = int(t.get("max_daily_gaps") or 0)
+        max_work_days = int(t.get("max_working_days") or 0)
+
+        a_t_daily: Optional[cp_model.IntVar] = None
+        a_t_consec: Optional[cp_model.IntVar] = None
+        a_t_gaps: Optional[cp_model.IntVar] = None
+        a_t_travel: Optional[cp_model.IntVar] = None
+        working_day_vars: List[cp_model.IntVar] = []
+
+        for d in range(num_days):
+            items = teacher_day_vars.get((tid, d)) or []
+            if not items:
+                continue
+            day_load = sum(blen * v for _, _, v, blen in items)
+            if a_t_daily is None:
+                a_t_daily = make_assumption(
+                    f"a_tmd_{tid}",
+                    {"kind": "t_max_daily", "priority": 1, "teacher_id": tid, "limit": max_daily},
+                )
+            dmodel.Add(day_load <= max_daily).OnlyEnforceIf(a_t_daily)
+
+            if 0 < max_work_days < num_days:
+                wd = dmodel.NewBoolVar(f"dwd_{tid}_{d}")
+                dmodel.AddMaxEquality(wd, [v for _, _, v, _ in items])
+                working_day_vars.append(wd)
+
+            if travel_min > 0:
+                b_items = teacher_building_day_vars.get((tid, d)) or []
+                if len(b_items) >= 2:
+                    by_bspan: Dict[Tuple[str, int, int], List[cp_model.IntVar]] = defaultdict(list)
+                    for bs, be, bname, bv in b_items:
+                        by_bspan[(bname, bs, be)].append(bv)
+                    grouped = list(by_bspan.items())
+                    for i in range(len(grouped)):
+                        (b1, s1, e1), vars1 = grouped[i]
+                        for j in range(i + 1, len(grouped)):
+                            (b2, s2, e2), vars2 = grouped[j]
+                            if b1 == b2:
+                                continue
+                            if (s2 - e1) < travel_min and (s1 - e2) < travel_min:
+                                if a_t_travel is None:
+                                    a_t_travel = make_assumption(
+                                        f"a_ttr_{tid}",
+                                        {"kind": "t_travel", "priority": 1, "teacher_id": tid, "travel_min": travel_min},
+                                    )
+                                dmodel.Add(sum(vars1) + sum(vars2) <= 1).OnlyEnforceIf(a_t_travel)
+
+            if not is_double_shift and periods_per_day >= 3 and ((0 < max_consec < periods_per_day) or max_gaps_day > 0):
+                busy_vars: List[cp_model.IntVar] = []
+                for p in range(periods_per_day):
+                    p_vars = teacher_day_period_vars.get((tid, d, p)) or []
+                    if not p_vars:
+                        busy_vars.append(dmodel.NewConstant(0))
+                    elif len(p_vars) == 1:
+                        busy_vars.append(p_vars[0])
+                    else:
+                        bv = dmodel.NewBoolVar(f"dtb_{tid}_{d}_{p}")
+                        dmodel.AddMaxEquality(bv, p_vars)
+                        busy_vars.append(bv)
+
+                if 0 < max_consec < periods_per_day:
+                    if a_t_consec is None:
+                        a_t_consec = make_assumption(
+                            f"a_tmc_{tid}",
+                            {"kind": "t_max_consec", "priority": 1, "teacher_id": tid, "limit": max_consec},
+                        )
+                    for p in range(periods_per_day - max_consec):
+                        dmodel.Add(sum(busy_vars[p : p + max_consec + 1]) <= max_consec).OnlyEnforceIf(a_t_consec)
+
+                if max_gaps_day > 0:
+                    has_before = [dmodel.NewConstant(0)]
+                    for p in range(1, periods_per_day):
+                        hb = dmodel.NewBoolVar(f"dhb_{tid}_{d}_{p}")
+                        dmodel.Add(hb >= busy_vars[p - 1])
+                        dmodel.Add(hb >= has_before[p - 1])
+                        has_before.append(hb)
+
+                    has_after: List[cp_model.IntVar] = [dmodel.NewConstant(0)] * periods_per_day
+                    for p in range(periods_per_day - 2, -1, -1):
+                        ha = dmodel.NewBoolVar(f"dha_{tid}_{d}_{p}")
+                        dmodel.Add(ha >= busy_vars[p + 1])
+                        dmodel.Add(ha >= has_after[p + 1])
+                        has_after[p] = ha
+
+                    day_gaps: List[cp_model.IntVar] = []
+                    for p in range(1, periods_per_day - 1):
+                        gp = dmodel.NewBoolVar(f"dgp_{tid}_{d}_{p}")
+                        dmodel.Add(gp >= has_before[p] + has_after[p] - busy_vars[p] - 1)
+                        day_gaps.append(gp)
+
+                    if day_gaps:
+                        if a_t_gaps is None:
+                            a_t_gaps = make_assumption(
+                                f"a_tmg_{tid}",
+                                {"kind": "t_max_gaps", "priority": 1, "teacher_id": tid, "limit": max_gaps_day},
+                            )
+                        dmodel.Add(sum(day_gaps) <= max_gaps_day).OnlyEnforceIf(a_t_gaps)
+
+        if 0 < max_work_days < num_days and len(working_day_vars) > max_work_days:
+            a_t_days = make_assumption(
+                f"a_tmdays_{tid}",
+                {"kind": "t_max_days", "priority": 1, "teacher_id": tid, "limit": max_work_days},
+            )
+            dmodel.Add(sum(working_day_vars) <= max_work_days).OnlyEnforceIf(a_t_days)
+
+    # Ortak seçmeli senkronizasyonu
+    if common_elective and class_common_hours:
+        by_grade_hrs: Dict[Tuple[str, int], List[str]] = defaultdict(list)
+        for cid, chrs in class_common_hours.items():
+            if chrs > 0 and cid in class_map:
+                gkey = str(class_map[cid].get("grade_key") or "")
+                by_grade_hrs[(gkey, chrs)].append(cid)
+        for (gkey, _chrs), cids in by_grade_hrs.items():
+            if len(cids) < 2:
+                continue
+            a_csync = make_assumption(
+                f"a_csync_{gkey}",
+                {"kind": "common_sync", "priority": 1, "grade_key": gkey, "class_ids": cids},
+            )
+            ref_cid = cids[0]
+            for other_cid in cids[1:]:
+                for d, p in sorted(common_elective):
+                    ref_vars = class_common_slot_vars.get((ref_cid, d, p)) or []
+                    oth_vars = class_common_slot_vars.get((other_cid, d, p)) or []
+                    if ref_vars or oth_vars:
+                        dmodel.Add(sum(ref_vars) == sum(oth_vars)).OnlyEnforceIf(a_csync)
+
+    if not assumptions:
+        return [], None
+
+    dmodel.AddAssumptions(assumptions)
+    dsolver = cp_model.CpSolver()
+    dsolver.parameters.max_time_in_seconds = max(1.0, float(max_diag_time_sec))
+    dsolver.parameters.num_search_workers = 1
+    dstatus = dsolver.Solve(dmodel)
+
+    if dstatus != cp_model.INFEASIBLE:
+        return [], None
+
+    core_indices = list(dsolver.SufficientAssumptionsForInfeasibility())
+    if not core_indices:
+        return [], None
+
+    raw_items: List[Dict[str, Any]] = []
+    for idx in core_indices:
+        meta = assumption_meta.get(idx)
+        if meta:
+            raw_items.append(meta)
+
+    # Önce kısıt kaynakları (priority=1), sonra çelişkiye dahil dersler (priority=2)
+    kind_order = {
+        "fixed": 1,
+        "t_unavail": 2,
+        "t_max_daily": 3,
+        "t_max_days": 4,
+        "t_max_consec": 5,
+        "t_max_gaps": 6,
+        "t_travel": 7,
+        "asgn_max_day": 8,
+        "room_cap": 9,
+        "rtype_cap": 10,
+        "common_sync": 11,
+        "common_excl": 12,
+        "t_overlap": 13,
+        "c_overlap": 14,
+        "asgn_place": 20,
+    }
+    raw_items.sort(key=lambda m: (m.get("priority", 99), kind_order.get(m.get("kind", ""), 50)))
+
+    diagnostics: List[Dict[str, Any]] = []
+    summary_parts: List[str] = []
+    involved_asgn_count = 0
+
+    for meta in raw_items:
+        kind = meta.get("kind")
+
+        if kind == "fixed":
+            aid = meta["assignment_id"]
+            asgn = assignments_by_id[aid]
+            cid = asgn["class_id"]
+            cname = asgn.get("class_name") or cid
+            course_name = asgn.get("course_name") or aid
+            day_name = _get_day_name(time_grid, meta["day_index"])
+            period_no = int(meta["start_period"]) + 1
+            blen = int(meta["length"])
+            t_ids = list(asgn.get("teacher_ids") or [])
+            links: List[Dict[str, Any]] = []
+            if t_ids and t_ids[0] in teacher_map:
+                t0 = teacher_map[t_ids[0]]
+                links.append({
+                    "nav": {"view": "menu3", "teacherId": t_ids[0]},
+                    "label": f"{t0.get('name', t_ids[0])} Ayarlarına Git →",
+                })
+            diagnostics.append({
+                "code": "CONFLICT_FIXED_ASSIGNMENT",
+                "category": "Sabit / Kilitli Ders",
+                "message": (
+                    f"Sabit/kilitli ders çelişkiye neden oluyor: {cname} — {course_name} "
+                    f"({day_name} {period_no}. ders, {blen} sa). Bu kilidi kaldırıp tekrar deneyin."
+                ),
+                "nav": {"view": "menu6", "tab": "class", "entityId": cid},
+                "linkLabel": f"{cname} Sabit Dersine Git →",
+                "links": links,
+            })
+            summary_parts.append(f"Sabit ders ({cname} {course_name}, {day_name} {period_no}. ders)")
+
+        elif kind == "t_unavail":
+            tid = meta["teacher_id"]
+            t = teacher_map.get(tid, {})
+            tname = t.get("name", tid)
+            unavail_cnt = len(teacher_unavail.get(tid, set()))
+            diagnostics.append({
+                "code": "CONFLICT_TEACHER_UNAVAILABLE",
+                "category": "Öğretmen Kapalı Saatleri",
+                "message": (
+                    f"{tname} öğretmeninin kapalı saatleri ({unavail_cnt} kapalı saat) "
+                    f"atanmış ders bloklarıyla çelişiyor; dersleri kalan açık saatlere sığmıyor."
+                ),
+                "nav": {"view": "menu3", "teacherId": tid},
+                "linkLabel": f"{tname} Kapalı Saatlerine Git →",
+            })
+            summary_parts.append(f"{tname} (kapalı saatler)")
+
+        elif kind == "t_max_daily":
+            tid = meta["teacher_id"]
+            t = teacher_map.get(tid, {})
+            tname = t.get("name", tid)
+            lim = int(meta["limit"])
+            diagnostics.append({
+                "code": "CONFLICT_TEACHER_DAILY_MAX",
+                "category": "Öğretmen Günlük Sınırı",
+                "message": (
+                    f"{tname} öğretmeninin günlük maksimum ders sınırı (en fazla {lim} sa/gün) "
+                    f"mevcut ders blokları ve diğer kısıtlarla çelişiyor."
+                ),
+                "nav": {"view": "menu3", "teacherId": tid},
+                "linkLabel": f"{tname} Günlük Sınırına Git →",
+            })
+            summary_parts.append(f"{tname} (günlük maks. {lim} sa)")
+
+        elif kind == "t_max_days":
+            tid = meta["teacher_id"]
+            t = teacher_map.get(tid, {})
+            tname = t.get("name", tid)
+            lim = int(meta["limit"])
+            diagnostics.append({
+                "code": "CONFLICT_TEACHER_MAX_DAYS",
+                "category": "Öğretmen Çalışma Günü",
+                "message": (
+                    f"{tname} öğretmeninin çalışılabilir gün sınırı (en fazla {lim} gün) "
+                    f"atanmış ders bloklarıyla çelişiyor."
+                ),
+                "nav": {"view": "menu3", "teacherId": tid},
+                "linkLabel": f"{tname} Gün Sınırına Git →",
+            })
+            summary_parts.append(f"{tname} (maks. {lim} gün)")
+
+        elif kind == "t_max_consec":
+            tid = meta["teacher_id"]
+            t = teacher_map.get(tid, {})
+            tname = t.get("name", tid)
+            lim = int(meta["limit"])
+            diagnostics.append({
+                "code": "CONFLICT_TEACHER_MAX_CONSECUTIVE",
+                "category": "Öğretmen Ardışık Sınırı",
+                "message": (
+                    f"{tname} öğretmeninin ardışık maksimum ders sınırı (en fazla {lim} saat) "
+                    f"mevcut bloklar ve açık saatlerle çelişiyor."
+                ),
+                "nav": {"view": "menu3", "teacherId": tid},
+                "linkLabel": f"{tname} Ardışık Sınırına Git →",
+            })
+            summary_parts.append(f"{tname} (ardışık maks. {lim} sa)")
+
+        elif kind == "t_max_gaps":
+            tid = meta["teacher_id"]
+            t = teacher_map.get(tid, {})
+            tname = t.get("name", tid)
+            lim = int(meta["limit"])
+            diagnostics.append({
+                "code": "CONFLICT_TEACHER_MAX_GAPS",
+                "category": "Öğretmen Pencere Sınırı",
+                "message": (
+                    f"{tname} öğretmeninin günlük maksimum pencere (boşluk) sınırı (en fazla {lim} pencere) "
+                    f"diğer kısıtlarla çelişiyor."
+                ),
+                "nav": {"view": "menu3", "teacherId": tid},
+                "linkLabel": f"{tname} Pencere Sınırına Git →",
+            })
+            summary_parts.append(f"{tname} (maks. {lim} pencere)")
+
+        elif kind == "t_travel":
+            tid = meta["teacher_id"]
+            t = teacher_map.get(tid, {})
+            tname = t.get("name", tid)
+            tmin = int(meta["travel_min"])
+            diagnostics.append({
+                "code": "CONFLICT_BUILDING_TRAVEL",
+                "category": "Bina Geçiş Süresi",
+                "message": (
+                    f"{tname} öğretmeninin farklı binalardaki dersleri arasında en az {tmin} dk "
+                    f"geçiş süresi kuralı sağlanamıyor."
+                ),
+                "nav": {"view": "menu3", "teacherId": tid},
+                "linkLabel": f"{tname} Ayarlarına Git →",
+            })
+            summary_parts.append(f"{tname} (bina geçiş süresi)")
+
+        elif kind == "asgn_max_day":
+            aid = meta["assignment_id"]
+            asgn = assignments_by_id[aid]
+            cid = asgn["class_id"]
+            cname = asgn.get("class_name") or cid
+            course_name = asgn.get("course_name") or aid
+            lim = int(meta["max_per_day"])
+            diagnostics.append({
+                "code": "CONFLICT_COURSE_MAX_PER_DAY",
+                "category": "Ders Günlük Blok Sınırı",
+                "message": (
+                    f"{cname} — {course_name} dersinin aynı gün en fazla {lim} blok kuralı "
+                    f"mevcut açık günler ve öğretmen müsaitliğiyle çelişiyor."
+                ),
+                "nav": {"view": "menu2", "classId": cid},
+                "linkLabel": f"{cname} Ders Bloklarına Git →",
+                "links": [{"nav": {"view": "menu4", "classId": cid, "search": course_name}, "label": "Ders Atamasına Git →"}],
+            })
+            summary_parts.append(f"{cname} {course_name} (günlük maks. {lim} blok)")
+
+        elif kind == "room_cap":
+            rid = meta["room_id"]
+            rm = room_map.get(rid, {})
+            rname = rm.get("name", rid)
+            cap = int(rm.get("simultaneous_capacity") or 1)
+            diagnostics.append({
+                "code": "CONFLICT_ROOM_CAPACITY",
+                "category": "Özel Mekan Kapasitesi",
+                "message": (
+                    f"{rname} özel mekanının eşzamanlı kapasitesi ({cap} sınıf) "
+                    f"atanmış derslerin uygun zamanlarıyla çakışıyor."
+                ),
+                "nav": {"view": "menu4", "focus": "rooms"},
+                "linkLabel": f"{rname} Mekan Ayarlarına Git →",
+            })
+            summary_parts.append(f"{rname} (mekan kapasitesi)")
+
+        elif kind == "rtype_cap":
+            rtype = meta["room_type"]
+            diagnostics.append({
+                "code": "CONFLICT_ROOM_TYPE_CAPACITY",
+                "category": "Özel Mekan Havuzu",
+                "message": (
+                    f"'{rtype}' türündeki özel mekan havuzunun kapasitesi "
+                    f"atanmış derslerin uygun saatlerine yetmiyor."
+                ),
+                "nav": {"view": "menu4", "focus": "rooms"},
+                "linkLabel": "Özel Mekanlara Git →",
+            })
+            summary_parts.append(f"'{rtype}' mekan havuzu")
+
+        elif kind == "common_sync":
+            gkey = meta.get("grade_key") or ""
+            cids = meta.get("class_ids") or []
+            cnames = ", ".join(class_map[c].get("name", c) for c in cids[:6] if c in class_map)
+            diagnostics.append({
+                "code": "CONFLICT_COMMON_ELECTIVE_SYNC",
+                "category": "Ortak Seçmeli Eşzamanlama",
+                "message": (
+                    f"{gkey}. sınıf şubelerinin ({cnames}) ortak seçmeli dersleri aynı saatlere "
+                    f"senkronize edilemiyor; ortak seçmeli slotlarını veya öğretmen müsaitliklerini kontrol edin."
+                ),
+                "nav": {"view": "menu1"},
+                "linkLabel": "Ortak Seçmeli Saatlerine Git →",
+            })
+            summary_parts.append(f"{gkey}. sınıf ortak seçmeli eşzamanlama")
+
+        elif kind == "common_excl":
+            diagnostics.append({
+                "code": "CONFLICT_COMMON_ELECTIVE_EXCLUSIVITY",
+                "category": "Ortak Seçmeli Alanı",
+                "message": (
+                    "Ortak seçmeli saatlerinin diğer derslere kapalı olması nedeniyle "
+                    "normal ders blokları kalan açık saatlere sığmıyor."
+                ),
+                "nav": {"view": "menu1"},
+                "linkLabel": "Ortak Seçmeli Saatlerine Git →",
+            })
+            summary_parts.append("Ortak seçmeli saat sınırı")
+
+        elif kind == "t_overlap":
+            tid = meta["teacher_id"]
+            t = teacher_map.get(tid, {})
+            tname = t.get("name", tid)
+            diagnostics.append({
+                "code": "CONFLICT_TEACHER_OVERLAP",
+                "category": "Öğretmen Saat Çakışması",
+                "message": (
+                    f"{tname} öğretmenine atanmış dersler aynı zaman dilimlerine sıkışıyor "
+                    f"ve çakışmadan yerleşemiyor."
+                ),
+                "nav": {"view": "menu3", "teacherId": tid},
+                "linkLabel": f"{tname} Ayarlarına Git →",
+                "links": [{"nav": {"view": "menu4"}, "label": "Ders Dağılımına Git →"}],
+            })
+            summary_parts.append(f"{tname} (ders çakışması)")
+
+        elif kind == "c_overlap":
+            cid = meta["class_id"]
+            cls = class_map.get(cid, {})
+            cname = cls.get("name", cid)
+            diagnostics.append({
+                "code": "CONFLICT_CLASS_OVERLAP",
+                "category": "Şube Saat / Blok Sığmama",
+                "message": (
+                    f"{cname} şubesinin ders blokları okulun açık saatlerine çakışmadan sığmıyor "
+                    f"(blok uzunlukları, öğle arası veya kapalı saatleri kontrol edin)."
+                ),
+                "nav": {"view": "menu2", "classId": cid},
+                "linkLabel": f"{cname} Ders/Bloklarına Git →",
+                "links": [{"nav": {"view": "menu1"}, "label": "Zaman Çizelgesine Git →"}],
+            })
+            summary_parts.append(f"{cname} şubesi (blok/saat çakışması)")
+
+        elif kind == "asgn_place":
+            if involved_asgn_count >= 8:
+                continue
+            involved_asgn_count += 1
+            aid = meta["assignment_id"]
+            asgn = assignments_by_id[aid]
+            cid = asgn["class_id"]
+            cname = asgn.get("class_name") or cid
+            course_name = asgn.get("course_name") or aid
+            blocks_str = "+".join(str(b) for b in (asgn.get("blocks") or []))
+            t_ids = list(asgn.get("teacher_ids") or [])
+            t_names = ", ".join(teacher_map[tid].get("name", tid) for tid in t_ids if tid in teacher_map)
+            links = [{"nav": {"view": "menu2", "classId": cid}, "label": f"{cname} Blokları →"}]
+            if t_ids and t_ids[0] in teacher_map:
+                t0 = teacher_map[t_ids[0]]
+                links.append({"nav": {"view": "menu3", "teacherId": t_ids[0]}, "label": f"{t0.get('name', t_ids[0])} →"})
+            diagnostics.append({
+                "code": "CONFLICT_INVOLVED_ASSIGNMENT",
+                "category": "Çelişkiye Dahil Ders",
+                "message": (
+                    f"{cname} — {course_name} (blok: {blocks_str}, öğretmen: {t_names or '—'}) "
+                    f"bu çelişki grubunun parçası."
+                ),
+                "nav": {"view": "menu4", "classId": cid, "search": course_name},
+                "linkLabel": f"{cname} {course_name} Atamasına Git →",
+                "links": links,
+            })
+
+    if not diagnostics:
+        return [], None
+
+    unique_summary = list(dict.fromkeys(summary_parts))[:4]
+    if unique_summary:
+        summary_msg = "Çelişki kaynağı tespit edildi: " + ", ".join(unique_summary) + "."
+    else:
+        summary_msg = diagnostics[0]["message"]
+
+    return diagnostics, summary_msg
+
+
 def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
     t0 = time.perf_counter()
     emit_progress("validating", "Model kontrol ediliyor")
@@ -243,6 +975,13 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
 
             # Kesin kural: hiç uygun aday yoksa sessiz atlama YOK -> INFEASIBLE
             if not valid_starts:
+                links: List[Dict[str, Any]] = [{"nav": {"view": "menu2", "classId": cid}, "label": f"{asgn.get('class_name')} Bloklarına Git →"}]
+                primary_nav: Dict[str, Any] = {"view": "menu4", "classId": cid, "search": asgn.get("course_name") or ""}
+                primary_label = f"{asgn.get('class_name')} Dersine Git →"
+                if t_ids and t_ids[0] in teacher_map:
+                    t0_name = teacher_map[t_ids[0]].get("name", t_ids[0])
+                    primary_nav = {"view": "menu3", "teacherId": t_ids[0]}
+                    primary_label = f"{t0_name} Kapalı Saatlerine Git →"
                 return {
                     "engine": ENGINE_NAME,
                     "status": "INFEASIBLE",
@@ -253,7 +992,11 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
                     "unplaced": [],
                     "diagnostics": [{
                         "code": "NO_VALID_START",
+                        "category": "Uygun Saat Bulunamadı",
                         "message": f"{asgn.get('class_name')} {asgn.get('course_name')} dersi için {blen} saatlik blok yerleştirilemiyor. Uygun açık ders saati bulunmuyor.",
+                        "nav": primary_nav,
+                        "linkLabel": primary_label,
+                        "links": links,
                     }],
                     "message": f"{asgn.get('class_name')} - {asgn.get('course_name')} dersi için uygun zaman bulunamadı.",
                 }
@@ -566,6 +1309,47 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
     solve_time = round(time.perf_counter() - t0, 3)
 
     if status_code not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        if status_name == "INFEASIBLE":
+            try:
+                core_diags, core_summary = diagnose_infeasibility(
+                    config=config,
+                    time_grid=time_grid,
+                    num_days=num_days,
+                    periods_per_day=periods_per_day,
+                    blocked=blocked,
+                    common_elective=common_elective,
+                    lunch_after=lunch_after,
+                    long_break_after=long_break_after,
+                    intervals=intervals,
+                    class_map=class_map,
+                    teacher_map=teacher_map,
+                    room_map=room_map,
+                    rooms_by_type=rooms_by_type,
+                    assignments=assignments,
+                    assignments_by_id=assignments_by_id,
+                    teacher_unavail=teacher_unavail,
+                    resolved_fixed=resolved_fixed,
+                    enforce_common_exclusivity=enforce_common_exclusivity,
+                    travel_min=travel_min,
+                    max_diag_time_sec=min(8.0, max_time_sec),
+                )
+            except Exception:
+                core_diags, core_summary = [], None
+
+            solve_time = round(time.perf_counter() - t0, 3)
+            if core_diags:
+                return {
+                    "engine": ENGINE_NAME,
+                    "status": status_name,
+                    "solve_time_sec": solve_time,
+                    "placed_blocks": 0,
+                    "total_blocks": total_blocks,
+                    "placements": [],
+                    "unplaced": [],
+                    "diagnostics": core_diags,
+                    "message": core_summary or core_diags[0]["message"],
+                }
+
         diag_msg = (
             "Kısıtlar birbiriyle çelişiyor; öğretmen kapalı saatleri, günlük sınırlar, özel mekanlar veya sabit dersleri kontrol edin."
             if status_name == "INFEASIBLE"
@@ -575,6 +1359,12 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
                 else "Model kurulumunda geçersiz bir durum oluştu."
             )
         )
+        fallback_links = [
+            {"nav": {"view": "menu3"}, "label": "Öğretmen Kısıtlarına Git →"},
+            {"nav": {"view": "menu2"}, "label": "Sınıf/Bloklara Git →"},
+            {"nav": {"view": "menu4", "focus": "rooms"}, "label": "Özel Mekanlara Git →"},
+            {"nav": {"view": "menu1"}, "label": "Zaman Çizelgesine Git →"},
+        ] if status_name == "INFEASIBLE" else []
         return {
             "engine": ENGINE_NAME,
             "status": status_name,
@@ -583,7 +1373,14 @@ def solve_timetable(config: Dict[str, Any]) -> Dict[str, Any]:
             "total_blocks": total_blocks,
             "placements": [],
             "unplaced": [],
-            "diagnostics": [{"code": status_name, "message": diag_msg}],
+            "diagnostics": [{
+                "code": status_name,
+                "category": "Kısıt Çelişkisi" if status_name == "INFEASIBLE" else status_name,
+                "message": diag_msg,
+                "nav": {"view": "menu3"} if status_name == "INFEASIBLE" else {"view": "menu5"},
+                "linkLabel": "Öğretmen Kısıtlarına Git →" if status_name == "INFEASIBLE" else "Dağıtım Ayarlarına Git →",
+                "links": fallback_links[1:] if len(fallback_links) > 1 else [],
+            }],
             "message": diag_msg,
         }
 

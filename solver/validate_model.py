@@ -239,9 +239,14 @@ def resolve_fixed_assignments(
         if b_idx is not None and 0 <= b_idx < len(blocks):
             key = (aid, b_idx)
             if key in resolved:
+                cid = asgn.get("class_id")
+                cname = asgn.get("class_name") or cid or "Şube"
                 errors.append({
                     "code": "DUPLICATE_FIXED_BLOCK",
-                    "message": f"Sabit dersler çakışıyor: {asgn.get('class_name')} - {asgn.get('course_name')} (blok {b_idx + 1}) birden fazla kez sabitlenmiş.",
+                    "category": "Sabit / Kilitli Ders",
+                    "message": f"Sabit dersler çakışıyor: {cname} - {asgn.get('course_name')} (blok {b_idx + 1}) birden fazla kez sabitlenmiş.",
+                    "nav": {"view": "menu6", "tab": "class", "entityId": cid},
+                    "linkLabel": f"{cname} Sabit Dersine Git →",
                 })
                 continue
             resolved[key] = {
@@ -279,18 +284,18 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
     Dönüş:
       {
         "valid": bool,
-        "errors": [{"code": str, "message": str}],
+        "errors": [{"code": str, "message": str, ...}],
         "warnings": [{"code": str, "message": str}],
         "summary": {...}
       }
     """
-    errors: List[Dict[str, str]] = []
-    warnings: List[Dict[str, str]] = []
+    errors: List[Dict[str, Any]] = []
+    warnings: List[Dict[str, Any]] = []
 
     if not isinstance(config, dict):
         return {
             "valid": False,
-            "errors": [{"code": "INVALID_PAYLOAD", "message": "Model verisi geçerli bir JSON nesnesi değil."}],
+            "errors": [{"code": "INVALID_PAYLOAD", "category": "Model Verisi", "message": "Model verisi geçerli bir JSON nesnesi değil."}],
             "warnings": [],
             "summary": {},
         }
@@ -302,7 +307,10 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
     if num_days <= 0 or periods_per_day <= 0:
         errors.append({
             "code": "INVALID_TIME_GRID",
+            "category": "Zaman Çizelgesi",
             "message": "Haftalık zaman çizelgesinde en az 1 açık gün ve 1 ders saati olmalıdır.",
+            "nav": {"view": "menu1"},
+            "linkLabel": "Zaman Çizelgesine Git →",
         })
         return {"valid": False, "errors": errors, "warnings": warnings, "summary": {}}
 
@@ -312,11 +320,29 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
     assignments = config.get("assignments") or []
 
     if not classes:
-        errors.append({"code": "NO_CLASSES", "message": "Önce en az bir sınıf/şube tanımlayın."})
+        errors.append({
+            "code": "NO_CLASSES",
+            "category": "Sınıf / Şube",
+            "message": "Önce en az bir sınıf/şube tanımlayın.",
+            "nav": {"view": "menu2"},
+            "linkLabel": "Şube Ekle →",
+        })
     if not teachers:
-        errors.append({"code": "NO_TEACHERS", "message": "Önce en az bir öğretmen tanımlayın."})
+        errors.append({
+            "code": "NO_TEACHERS",
+            "category": "Öğretmen",
+            "message": "Önce en az bir öğretmen tanımlayın.",
+            "nav": {"view": "menu3"},
+            "linkLabel": "Öğretmen Ekle →",
+        })
     if not assignments:
-        errors.append({"code": "NO_ASSIGNMENTS", "message": "Dağıtılacak ders ataması bulunmuyor."})
+        errors.append({
+            "code": "NO_ASSIGNMENTS",
+            "category": "Ders Atama",
+            "message": "Dağıtılacak ders ataması bulunmuyor.",
+            "nav": {"view": "menu2"},
+            "linkLabel": "Derslere Git →",
+        })
 
     if errors:
         return {"valid": False, "errors": errors, "warnings": warnings, "summary": {}}
@@ -357,25 +383,43 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
         use_common = bool(asgn.get("use_common_elective_slot"))
 
         if not aid:
-            errors.append({"code": "MISSING_ASSIGNMENT_ID", "message": f"{cname} - {course_name} atamasında kimlik eksik."})
+            errors.append({
+                "code": "MISSING_ASSIGNMENT_ID",
+                "category": "Ders Atama",
+                "message": f"{cname} - {course_name} atamasında kimlik eksik.",
+                "nav": {"view": "menu4", "classId": cid},
+                "linkLabel": f"{cname} Dersine Git →",
+            })
             continue
         assignments_by_id[aid] = asgn
 
         if cid not in class_map:
-            errors.append({"code": "UNKNOWN_CLASS", "message": f"{cname} şubesi tanımlı sınıflar arasında bulunamadı."})
+            errors.append({
+                "code": "UNKNOWN_CLASS",
+                "category": "Sınıf / Şube",
+                "message": f"{cname} şubesi tanımlı sınıflar arasında bulunamadı.",
+                "nav": {"view": "menu2"},
+                "linkLabel": "Şubelere Git →",
+            })
             continue
 
         if not blocks or sum(blocks) != hours:
             errors.append({
                 "code": "BLOCK_SUM_MISMATCH",
+                "category": "Blok Yapısı",
                 "message": f"Blok toplamı saatle uyuşmuyor: {cname} - {course_name} ({hours} sa, bloklar: {blocks}).",
+                "nav": {"view": "menu2", "classId": cid},
+                "linkLabel": f"{cname} Bloklarını Düzelt →",
             })
             continue
 
         if not t_ids:
             errors.append({
                 "code": "NO_TEACHER",
+                "category": "Öğretmen Ataması",
                 "message": f"Öğretmen yok: {cname} - {course_name} dersi için Menü 4'ten öğretmen atayın.",
+                "nav": {"view": "menu4", "classId": cid, "search": course_name},
+                "linkLabel": f"{cname} Ders Atamasına Git →",
             })
             continue
 
@@ -383,14 +427,20 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
         if missing_teachers:
             errors.append({
                 "code": "UNKNOWN_TEACHER",
+                "category": "Öğretmen Ataması",
                 "message": f"Tanımsız öğretmen: {cname} - {course_name} dersine atanmış öğretmen listede bulunamadı.",
+                "nav": {"view": "menu4", "classId": cid, "search": course_name},
+                "linkLabel": f"{cname} Ders Atamasına Git →",
             })
             continue
 
         if room_id and room_id not in room_map:
             errors.append({
                 "code": "UNKNOWN_ROOM",
+                "category": "Özel Mekan",
                 "message": f"Derslik bulunamıyor: {cname} - {course_name} için seçilen özel mekan listede yok.",
+                "nav": {"view": "menu4", "classId": cid, "search": course_name},
+                "linkLabel": f"{cname} Mekan Seçimine Git →",
             })
             continue
 
@@ -424,21 +474,35 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
                 if use_common:
                     errors.append({
                         "code": "COMMON_ELECTIVE_INSUFFICIENT",
+                        "category": "Ortak Seçmeli",
                         "message": f"Ortak seçmeli alanı yetersiz: {cname} - {course_name} ({blen} saatlik blok) için uygun ortak seçmeli slotu yok.",
+                        "nav": {"view": "menu1"},
+                        "linkLabel": "Ortak Seçmeli Saatlerine Git →",
+                        "links": [{"nav": {"view": "menu2", "classId": cid}, "label": f"{cname} Derslerine Git →"}],
                     })
                 else:
                     errors.append({
                         "code": "BLOCK_DOES_NOT_FIT",
+                        "category": "Blok / Zaman Çizelgesi",
                         "message": f"Blok uzunluğu sığmıyor: {cname} - {course_name} ({blen} saatlik blok) kapalı saatler veya öğle arası nedeniyle yerleşemiyor.",
+                        "nav": {"view": "menu2", "classId": cid},
+                        "linkLabel": f"{cname} Bloklarını Düzelt →",
+                        "links": [{"nav": {"view": "menu1"}, "label": "Zaman Çizelgesine Git →"}],
                     })
             elif not full_valid:
                 t_names = ", ".join(teacher_map[tid].get("name", tid) for tid in t_ids)
+                first_tid = t_ids[0]
+                first_tname = teacher_map[first_tid].get("name", first_tid)
                 errors.append({
                     "code": "TEACHER_UNAVAILABLE",
+                    "category": "Öğretmen Kapalı Saatleri",
                     "message": (
                         f"{cname} {course_name} dersi için {blen} saatlik blok yerleştirilemiyor. "
                         f"Atanan öğretmen ({t_names}) için uygun zamanlarda {blen} ardışık açık ders saati bulunmuyor."
                     ),
+                    "nav": {"view": "menu3", "teacherId": first_tid},
+                    "linkLabel": f"{first_tname} Kapalı Saatlerine Git →",
+                    "links": [{"nav": {"view": "menu2", "classId": cid}, "label": f"{cname} Bloklarına Git →"}],
                 })
 
         # Aynı gün maksimum blok sayısı ve gün sayısı kontrolü
@@ -446,16 +510,24 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
         if max_per_day > 0 and len(blocks) > num_days * max_per_day:
             errors.append({
                 "code": "MAX_BLOCKS_PER_DAY_EXCEEDED",
+                "category": "Günlük Blok Sınırı",
                 "message": f"Blok sayısı sığmıyor: {cname} - {course_name} ({len(blocks)} blok), günlük maks {max_per_day} blok sınırı ile {num_days} güne yerleşemez.",
+                "nav": {"view": "menu2", "classId": cid},
+                "linkLabel": f"{cname} Ders Bloklarına Git →",
             })
 
     # Şube kapasite denetimi
     for cid, hrs in class_hours.items():
         cls = class_map[cid]
+        cname = cls.get("name", cid)
         if hrs > open_slots_per_week:
             errors.append({
                 "code": "CLASS_OVER_CAPACITY",
-                "message": f"Şube açık saati yetersiz: {cls.get('name', cid)} için {hrs} saat ders var ancak haftada {open_slots_per_week} açık saat mevcut.",
+                "category": "Şube Ders Kapasitesi",
+                "message": f"Şube açık saati yetersiz: {cname} için {hrs} saat ders var ancak haftada {open_slots_per_week} açık saat mevcut.",
+                "nav": {"view": "menu2", "classId": cid},
+                "linkLabel": f"{cname} Derslerine Git →",
+                "links": [{"nav": {"view": "menu1"}, "label": "Zaman Çizelgesine Git →"}],
             })
 
     # Öğretmen yük ve müsaitlik denetimi
@@ -469,7 +541,11 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
         if hrs > max_w:
             errors.append({
                 "code": "TEACHER_OVER_WEEKLY_MAX",
+                "category": "Öğretmen Haftalık Sınırı",
                 "message": f"Öğretmen haftalık sınırı aşılıyor: {tname} için {hrs} saat ders atanmış, haftalık maksimum {max_w} saat.",
+                "nav": {"view": "menu3", "teacherId": tid},
+                "linkLabel": f"{tname} Ayarlarına Git →",
+                "links": [{"nav": {"view": "menu4"}, "label": "Ders Dağılımına Git →"}],
             })
 
         avail_total = 0
@@ -488,33 +564,46 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
             if hrs > top_days_cap:
                 errors.append({
                     "code": "TEACHER_MAX_WORKING_DAYS_CAPACITY",
+                    "category": "Öğretmen Çalışma Günü",
                     "message": (
                         f"Öğretmen çalışılabilir gün sınırı yetersiz: {tname} ({hrs} sa) haftada en fazla "
                         f"{max_work_days} gün sınırı ile sığmıyor (maks {top_days_cap} sa)."
                     ),
+                    "nav": {"view": "menu3", "teacherId": tid},
+                    "linkLabel": f"{tname} Gün Sınırına Git →",
                 })
 
         max_daily_cap_sum = sum(day_caps)
         if hrs > avail_total:
             errors.append({
                 "code": "TEACHER_UNAVAILABLE_CAPACITY",
+                "category": "Öğretmen Kapalı Saatleri",
                 "message": f"Öğretmen kapalı saatleri: {tname} için {hrs} saat ders atanmış ancak sadece {avail_total} müsait saati var.",
+                "nav": {"view": "menu3", "teacherId": tid},
+                "linkLabel": f"{tname} Kapalı Saatlerine Git →",
             })
         elif hrs > max_daily_cap_sum:
             errors.append({
                 "code": "TEACHER_DAILY_MAX_CAPACITY",
+                "category": "Öğretmen Günlük Sınırı",
                 "message": f"Öğretmen günlük ders sınırı yetersiz: {tname} ({hrs} sa) günlük en fazla {max_d} saat sınırı ile müsait günlere sığmıyor (maks {max_daily_cap_sum} sa).",
+                "nav": {"view": "menu3", "teacherId": tid},
+                "linkLabel": f"{tname} Günlük Sınırına Git →",
             })
 
     # Özel derslik kapasite denetimi
     for rid, hrs in room_hours.items():
         rm = room_map[rid]
+        rname = rm.get("name", rid)
         cap = int(rm.get("simultaneous_capacity") or 1)
         max_cap = open_slots_per_week * cap
         if hrs > max_cap:
             errors.append({
                 "code": "ROOM_OVER_CAPACITY",
-                "message": f"Derslik bulunamıyor: {rm.get('name', rid)} mekanına {hrs} saat ders atanmış, haftalık kapasite {max_cap} saat.",
+                "category": "Özel Mekan Kapasitesi",
+                "message": f"Derslik bulunamıyor: {rname} mekanına {hrs} saat ders atanmış, haftalık kapasite {max_cap} saat.",
+                "nav": {"view": "menu4", "focus": "rooms"},
+                "linkLabel": f"{rname} Mekan Ayarlarına Git →",
             })
 
     for rtype, hrs in room_type_hours.items():
@@ -523,7 +612,10 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
         if hrs > total_cap:
             errors.append({
                 "code": "ROOM_TYPE_OVER_CAPACITY",
+                "category": "Özel Mekan Kapasitesi",
                 "message": f"Derslik bulunamıyor: '{rtype}' türündeki dersler için {hrs} saat gerekiyor ancak mevcut mekan kapasitesi {total_cap} saat.",
+                "nav": {"view": "menu4", "focus": "rooms"},
+                "linkLabel": "Özel Mekanlara Git →",
             })
 
     # Sabit / kilitli atama denetimi
@@ -547,7 +639,10 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
         if d < 0 or d >= num_days or p < 0 or p + blen > periods_per_day:
             errors.append({
                 "code": "FIXED_OUT_OF_BOUNDS",
+                "category": "Sabit / Kilitli Ders",
                 "message": f"Sabit ders sınır dışında: {cname} - {course_name} (gün {d + 1}, {p + 1}. ders).",
+                "nav": {"view": "menu6", "tab": "class", "entityId": cid},
+                "linkLabel": f"{cname} Sabit Dersine Git →",
             })
             continue
 
@@ -555,14 +650,21 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
         if crosses_break(p, blen, effective_lunch) or crosses_break(p, blen, long_break_after):
             errors.append({
                 "code": "FIXED_CROSSES_BREAK",
+                "category": "Sabit / Kilitli Ders",
                 "message": f"Sabit ders öğle/uzun arayı bölüyor: {cname} - {course_name}.",
+                "nav": {"view": "menu6", "tab": "class", "entityId": cid},
+                "linkLabel": f"{cname} Sabit Dersine Git →",
             })
 
         for k in range(blen):
             if (d, p + k) in blocked:
                 errors.append({
                     "code": "FIXED_IN_BLOCKED_SLOT",
+                    "category": "Sabit / Kilitli Ders",
                     "message": f"Sabit ders kapalı saatte: {cname} - {course_name} okulun kapalı saatine sabitlenmiş.",
+                    "nav": {"view": "menu6", "tab": "class", "entityId": cid},
+                    "linkLabel": f"{cname} Sabit Dersine Git →",
+                    "links": [{"nav": {"view": "menu1"}, "label": "Zaman Çizelgesine Git →"}],
                 })
                 break
 
@@ -572,7 +674,11 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
                 tname = teacher_map.get(tid, {}).get("name", tid)
                 errors.append({
                     "code": "FIXED_TEACHER_UNAVAILABLE",
+                    "category": "Sabit Ders Çakışması",
                     "message": f"Sabit ders çelişkisi: {cname} - {course_name} sabitli ama {tname} o saatte kapalı.",
+                    "nav": {"view": "menu3", "teacherId": tid},
+                    "linkLabel": f"{tname} Kapalı Saatlerine Git →",
+                    "links": [{"nav": {"view": "menu6", "tab": "class", "entityId": cid}, "label": f"{cname} Kilidini Aç →"}],
                 })
 
         span_i = get_block_physical_span(intervals, cls_shift, p, blen)
@@ -591,7 +697,10 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
                 # Aynı şubede eşzamanlı alt grup değilse çakışma
                 errors.append({
                     "code": "FIXED_CLASS_CONFLICT",
+                    "category": "Sabit Ders Çakışması",
                     "message": f"Sabit dersler çakışıyor: {cname} şubesinde {course_name} ile {asgn_b.get('course_name')} aynı saatte sabitlenmiş.",
+                    "nav": {"view": "menu6", "tab": "class", "entityId": cid},
+                    "linkLabel": f"{cname} Sabit Derslerine Git →",
                 })
 
             shared_teachers = set(asgn.get("teacher_ids") or []) & set(asgn_b.get("teacher_ids") or [])
@@ -599,7 +708,11 @@ def validate_model(config: Dict[str, Any]) -> Dict[str, Any]:
                 tname = teacher_map.get(tid, {}).get("name", tid)
                 errors.append({
                     "code": "FIXED_TEACHER_CONFLICT",
+                    "category": "Sabit Ders Çakışması",
                     "message": f"Sabit dersler çakışıyor: {tname} aynı saatte hem {cname} hem {asgn_b.get('class_name')} dersine sabitlenmiş.",
+                    "nav": {"view": "menu6", "tab": "teacher", "entityId": tid},
+                    "linkLabel": f"{tname} Programına Git →",
+                    "links": [{"nav": {"view": "menu6", "tab": "class", "entityId": cid}, "label": f"{cname} Kilidini Aç →"}],
                 })
 
     return {

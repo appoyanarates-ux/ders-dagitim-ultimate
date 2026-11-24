@@ -177,3 +177,75 @@ def test_cli_info_and_file_io():
         assert res["engine"] == ENGINE_NAME
         assert res["status"] in ("OPTIMAL", "FEASIBLE")
         assert res["placed_blocks"] == 1
+
+
+def test_infeasible_cp_sat_pinpoints_teacher_daily_max_and_unavail():
+    """Ön denetimden geçen ancak CP-SAT'ta çözülemeyen (2+2>3 günlük sınır) çelişkinin tam kaynağını ve linkini döndürmeli."""
+    cfg = make_base_config(5, 6, 0)
+    cfg["classes"] = [
+        {"id": "c1", "name": "5/A", "grade_key": "5", "shift": "full_day"},
+        {"id": "c2", "name": "5/B", "grade_key": "5", "shift": "full_day"},
+        {"id": "c3", "name": "5/C", "grade_key": "5", "shift": "full_day"},
+    ]
+    unavail = [{"day_index": d, "period": p} for d in [2, 3, 4] for p in range(1, 7)]
+    cfg["teachers"] = [
+        {"id": "t1", "name": "Ayşe Yılmaz", "branch": "Mat", "min_weekly_hours": 0, "max_weekly_hours": 30, "max_daily_hours": 3, "unavailable_slots": unavail, "prefer_avoid_slots": []},
+    ]
+    cfg["assignments"] = [
+        {"assignment_id": "a1", "class_id": "c1", "class_name": "5/A", "course_id": "m", "course_code": "MAT", "course_name": "Matematik", "hours": 2, "blocks": [2], "teacher_ids": ["t1"], "room_id": None, "room_type": "standard", "max_blocks_per_day": 1, "use_common_elective_slot": False},
+        {"assignment_id": "a2", "class_id": "c2", "class_name": "5/B", "course_id": "m", "course_code": "MAT", "course_name": "Matematik", "hours": 2, "blocks": [2], "teacher_ids": ["t1"], "room_id": None, "room_type": "standard", "max_blocks_per_day": 1, "use_common_elective_slot": False},
+        {"assignment_id": "a3", "class_id": "c3", "class_name": "5/C", "course_id": "m", "course_code": "MAT", "course_name": "Matematik", "hours": 2, "blocks": [2], "teacher_ids": ["t1"], "room_id": None, "room_type": "standard", "max_blocks_per_day": 1, "use_common_elective_slot": False},
+    ]
+    res = solve_timetable(cfg)
+    assert res["status"] == "INFEASIBLE"
+    assert "Ayşe Yılmaz" in res["message"]
+    codes = {d.get("code") for d in res["diagnostics"]}
+    assert "CONFLICT_TEACHER_DAILY_MAX" in codes
+    assert "CONFLICT_TEACHER_UNAVAILABLE" in codes
+    teacher_diags = [d for d in res["diagnostics"] if d.get("code") == "CONFLICT_TEACHER_DAILY_MAX"]
+    assert teacher_diags[0]["nav"] == {"view": "menu3", "teacherId": "t1"}
+
+
+def test_infeasible_cp_sat_pinpoints_course_max_blocks_per_day():
+    """Dersin günlük maks. 1 blok kuralı ile öğretmen kapalı günlerinin çelişkisini tam adresle döndürmeli."""
+    cfg = make_base_config(5, 6, 0)
+    cfg["classes"] = [{"id": "c1", "name": "6/A", "grade_key": "6", "shift": "full_day"}]
+    unavail = [{"day_index": d, "period": p} for d in [2, 3, 4] for p in range(1, 7)]
+    cfg["teachers"] = [
+        {"id": "t1", "name": "Mehmet Demir", "branch": "Fen", "min_weekly_hours": 0, "max_weekly_hours": 30, "max_daily_hours": 6, "unavailable_slots": unavail, "prefer_avoid_slots": []},
+    ]
+    cfg["assignments"] = [
+        {"assignment_id": "a1", "class_id": "c1", "class_name": "6/A", "course_id": "f", "course_code": "FEN", "course_name": "Fen Bilimleri", "hours": 6, "blocks": [2, 2, 2], "teacher_ids": ["t1"], "room_id": None, "room_type": "standard", "max_blocks_per_day": 1, "use_common_elective_slot": False},
+    ]
+    res = solve_timetable(cfg)
+    assert res["status"] == "INFEASIBLE"
+    codes = {d.get("code") for d in res["diagnostics"]}
+    assert "CONFLICT_COURSE_MAX_PER_DAY" in codes
+    course_diags = [d for d in res["diagnostics"] if d.get("code") == "CONFLICT_COURSE_MAX_PER_DAY"]
+    assert course_diags[0]["nav"] == {"view": "menu2", "classId": "c1"}
+
+
+def test_infeasible_cp_sat_pinpoints_room_contention():
+    """Özel mekan kapasitesi ile öğretmen müsaitlik pencerelerinin çakışmasını tam mekan linkiyle döndürmeli."""
+    cfg = make_base_config(5, 4, 0)
+    cfg["classes"] = [
+        {"id": "c1", "name": "7/A", "grade_key": "7", "shift": "full_day"},
+        {"id": "c2", "name": "7/B", "grade_key": "7", "shift": "full_day"},
+    ]
+    only_mon_1_2 = [{"day_index": d, "period": p} for d in range(5) for p in range(1, 5) if not (d == 0 and p in (1, 2))]
+    cfg["teachers"] = [
+        {"id": "t1", "name": "Ali Kaya", "branch": "BT", "min_weekly_hours": 0, "max_weekly_hours": 30, "max_daily_hours": 4, "unavailable_slots": only_mon_1_2, "prefer_avoid_slots": []},
+        {"id": "t2", "name": "Veli Öz", "branch": "BT", "min_weekly_hours": 0, "max_weekly_hours": 30, "max_daily_hours": 4, "unavailable_slots": only_mon_1_2, "prefer_avoid_slots": []},
+    ]
+    cfg["rooms"] = [{"id": "r1", "name": "BT Lab", "room_type": "bilisim_lab", "simultaneous_capacity": 1}]
+    cfg["assignments"] = [
+        {"assignment_id": "a1", "class_id": "c1", "class_name": "7/A", "course_id": "bt", "course_code": "BT", "course_name": "Bilişim", "hours": 2, "blocks": [2], "teacher_ids": ["t1"], "room_id": "r1", "room_type": "bilisim_lab", "max_blocks_per_day": 1, "use_common_elective_slot": False},
+        {"assignment_id": "a2", "class_id": "c2", "class_name": "7/B", "course_id": "bt", "course_code": "BT", "course_name": "Bilişim", "hours": 2, "blocks": [2], "teacher_ids": ["t2"], "room_id": "r1", "room_type": "bilisim_lab", "max_blocks_per_day": 1, "use_common_elective_slot": False},
+    ]
+    res = solve_timetable(cfg)
+    assert res["status"] == "INFEASIBLE"
+    codes = {d.get("code") for d in res["diagnostics"]}
+    assert "CONFLICT_ROOM_CAPACITY" in codes
+    room_diags = [d for d in res["diagnostics"] if d.get("code") == "CONFLICT_ROOM_CAPACITY"]
+    assert room_diags[0]["nav"] == {"view": "menu4", "focus": "rooms"}
+

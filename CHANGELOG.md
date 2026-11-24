@@ -2,6 +2,9 @@
 
 Tüm sürümler Semantik Sürümleme (`MAJOR.MINOR.PATCH`) düzenini izler.
 
+## [1.0.7] — 2026-11-24
+- Geliştirmeler
+
 ## [1.0.6] — 2026-11-24
 - Tam kurulabilir Mobil PWA desteği: Android Chrome & iOS Safari simgeleri (180/192/512/maskable), "Yükle / Ana Ekrana Ekle" akışı, alt mobil hızlı gezinme çubuğu, çevrimdışı Service Worker, cPanel PWA paketi (`evrakplus-ders-dagitim-pwa-1.0.6.zip`) ve GitHub Pages otomatik dağıtım iş akışı.
 
