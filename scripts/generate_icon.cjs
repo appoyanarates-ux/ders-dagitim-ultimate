@@ -135,10 +135,23 @@ function buildIco(pngBuffers, sizes) {
 }
 
 const buildDir = path.resolve(__dirname, '../build');
+const assetsDir = path.resolve(__dirname, '../renderer/assets');
 fs.mkdirSync(buildDir, { recursive: true });
+fs.mkdirSync(assetsDir, { recursive: true });
+
 const sizes = [256, 64, 48, 32, 16];
 const pngs = sizes.map((s) => createIconPng(s));
 const ico = buildIco(pngs, sizes);
 fs.writeFileSync(path.join(buildDir, 'icon.ico'), ico);
 fs.writeFileSync(path.join(buildDir, 'icon.png'), pngs[0]);
-console.log(`Simge olusturuldu: build/icon.ico (${ico.length} bayt) ve build/icon.png (${pngs[0].length} bayt)`);
+
+// Mobil PWA (Android Chrome & iOS Safari) simgeleri
+const pwa192 = createIconPng(192);
+const pwa512 = createIconPng(512);
+const apple180 = createIconPng(180);
+fs.writeFileSync(path.join(assetsDir, 'icon-192.png'), pwa192);
+fs.writeFileSync(path.join(assetsDir, 'icon-512.png'), pwa512);
+fs.writeFileSync(path.join(assetsDir, 'icon-maskable-512.png'), pwa512);
+fs.writeFileSync(path.join(assetsDir, 'apple-touch-icon.png'), apple180);
+
+console.log(`Simge olusturuldu: build/icon.ico (${ico.length} bayt), PWA PNG'leri (180/192/512) -> renderer/assets/`);

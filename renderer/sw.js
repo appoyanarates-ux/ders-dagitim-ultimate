@@ -1,7 +1,8 @@
 'use strict';
 
-const CACHE_NAME = 'evrakplus-dd-pwa-v1.0.5';
+const CACHE_NAME = 'evrakplus-dd-pwa-v1.0.6';
 const STATIC_ASSETS = [
+  './',
   './index.html',
   './app.js',
   './editor_logic.js',
@@ -9,10 +10,15 @@ const STATIC_ASSETS = [
   './duty_module.js',
   './evrakplus_ui.js',
   './system_ui.js',
+  './pwa_install.js',
   './manifest.webmanifest',
   './assets/styles.css',
   './assets/lucide.min.js',
-  './assets/xlsx.full.min.js'
+  './assets/xlsx.full.min.js',
+  './assets/icon-192.png',
+  './assets/icon-512.png',
+  './assets/icon-maskable-512.png',
+  './assets/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -37,6 +43,23 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.includes('/wp-json/')) return;
   if (url.origin !== self.location.origin) return;
 
+  // Gezinme istekleri için çevrimdışı index.html yedeği (Network-first -> Cache)
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req)
+        .then((resp) => {
+          if (resp && resp.status === 200) {
+            const clone = resp.clone();
+            caches.open(CACHE_NAME).then((c) => c.put('./index.html', clone));
+          }
+          return resp;
+        })
+        .catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  // Statik dosyalar için Cache-first -> Network
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;

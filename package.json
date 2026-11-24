@@ -1,6 +1,6 @@
 {
   "name": "evrakplus-ders-dagitim",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "EvrakPlus Ders Dağıtım — MEB 2026-2027",
   "author": "EvrakPlus",
   "license": "MIT",
@@ -11,11 +11,12 @@
     "prepare:renderer": "npm run copy:assets && npm run build:css",
     "start": "electron .",
     "test:py": ".venv\\Scripts\\pytest.exe -v tests",
-    "test:js": "node --test tests/test_import_export.mjs tests/test_export_engine.mjs tests/test_evrakplus_sync.mjs tests/test_release_v6.mjs tests/test_duty_and_audit.mjs",
+    "test:js": "node --test tests/test_import_export.mjs tests/test_export_engine.mjs tests/test_evrakplus_sync.mjs tests/test_release_v6.mjs tests/test_duty_and_audit.mjs tests/test_pwa.mjs",
     "test": "npm run test:py && npm run test:js",
     "build:solver": "powershell -ExecutionPolicy Bypass -File ./scripts/build_solver_windows.ps1",
     "build:wp-zip": "node scripts/create_zip.cjs release/evrakplus-ders-dagitim-bridge-1.0.0.zip evrakplus-ders-dagitim-bridge",
-    "build:source-zip": "node scripts/create_zip.cjs release/EvrakPlus-Ders-Dagitim-Source-1.0.5.zip electron renderer solver tests scripts build docs .github evrakplus-ders-dagitim-bridge package.json package-lock.json electron-builder.yml tailwind.config.cjs .gitignore CHANGELOG.md KULLANIM_KILAVUZU.md TEST_RAPORU.md",
+    "build:pwa-zip": "node scripts/generate_icon.cjs && npm run prepare:renderer && node scripts/create_zip.cjs release/evrakplus-ders-dagitim-pwa-1.0.6.zip renderer",
+    "build:source-zip": "node scripts/create_zip.cjs release/EvrakPlus-Ders-Dagitim-Source-1.0.6.zip electron renderer solver tests scripts build docs .github evrakplus-ders-dagitim-bridge package.json package-lock.json electron-builder.yml tailwind.config.cjs .gitignore CHANGELOG.md KULLANIM_KILAVUZU.md TEST_RAPORU.md",
     "build:win": "node scripts/generate_icon.cjs && npm run prepare:renderer && electron-builder --win --config electron-builder.yml --publish never"
   },
   "devDependencies": {

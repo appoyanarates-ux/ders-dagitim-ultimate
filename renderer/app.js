@@ -5499,5 +5499,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.EvrakPlusUI) window.EvrakPlusUI.refreshSidebar();
       }
     });
+  if (window.EvrakPlusPWA && typeof window.EvrakPlusPWA.init === 'function') {
+    window.EvrakPlusPWA.init({
+      showToast: (msg) => showToast(msg),
+      navigateMobile: (target) => {
+        if (target === 'duty') {
+          state.activeView = 'menu6';
+          state.m6Tab = 'duty';
+        } else {
+          state.activeView = target;
+          if (target === 'menu6' && state.m6Tab === 'duty') state.m6Tab = 'class';
+        }
+        saveState();
+        renderAll();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+    window.EvrakPlusPWA.syncBottomNavActive(state.activeView, state.m6Tab);
   }
 });

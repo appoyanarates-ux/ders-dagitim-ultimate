@@ -2,10 +2,16 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Ders Dağıtım" />
   <title>EvrakPlus – Okul Ders Dağıtım Programı — MEB 2026-2027</title>
   <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./assets/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png" />
   <link rel="stylesheet" href="./assets/styles.css" />
   <script src="./assets/lucide.min.js"></script>
   <script src="./assets/xlsx.full.min.js"></script>
@@ -21,9 +27,14 @@
         <div class="text-[11px] text-slate-400">MEB 2026-2027</div>
       </div>
     </div>
-    <button id="mobileMenuBtn" type="button" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200" aria-label="Menüyü Aç">
-      <i data-lucide="menu" class="w-5 h-5"></i>
-    </button>
+    <div class="flex items-center gap-2">
+      <button id="btnMobilePwaInstall" type="button" class="hidden items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-sm transition">
+        <i data-lucide="smartphone" class="w-3.5 h-3.5"></i> Yükle
+      </button>
+      <button id="mobileMenuBtn" type="button" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200" aria-label="Menüyü Aç">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+    </div>
   </header>
 
   <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-900/50 z-40 hidden lg:hidden"></div>
@@ -99,13 +110,13 @@
       <p class="text-[11px] text-slate-500 text-center">Veriler yerel olarak otomatik saklanır</p>
       <button id="btnSidebarSettingsAbout" type="button" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-950/60 hover:bg-slate-800 border border-slate-800 text-[11px] font-medium text-slate-300 hover:text-white transition">
         <span class="inline-flex items-center gap-1.5"><i data-lucide="settings" class="w-3.5 h-3.5 text-slate-400"></i> Ayarlar ve Hakkında</span>
-        <span id="sidebarVersionTag" class="text-[10px] text-slate-400 font-mono">v1.0.5</span>
+        <span id="sidebarVersionTag" class="text-[10px] text-slate-400 font-mono">v1.0.6</span>
       </button>
     </div>
   </aside>
 
   <!-- Ana İçerik -->
-  <main class="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+  <main class="flex-1 min-w-0 p-4 pb-24 sm:p-6 sm:pb-24 lg:p-8 lg:pb-8 max-w-7xl mx-auto w-full">
 
     <!-- =====================================================================
          MENÜ 1: KURUM VE ZAMAN ÇİZELGESİ
@@ -1927,8 +1938,30 @@
     </div>
   </div>
 
+  <!-- Mobil Alt Gezinme Çubuğu (PWA) -->
+  <nav id="mobileBottomNav" aria-label="Mobil Hızlı Menü" class="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 shadow-lg flex items-center justify-around px-1 pt-1.5 pb-[max(0.4rem,env(safe-area-inset-bottom))] no-print">
+    <button type="button" data-mob-nav="menu1" class="mob-nav-btn flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] text-slate-500">
+      <i data-lucide="building-2" class="w-4 h-4"></i><span>Kurum</span>
+    </button>
+    <button type="button" data-mob-nav="menu3" class="mob-nav-btn flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] text-slate-500">
+      <i data-lucide="users" class="w-4 h-4"></i><span>Öğrt.</span>
+    </button>
+    <button type="button" data-mob-nav="menu4" class="mob-nav-btn flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] text-slate-500">
+      <i data-lucide="book-open" class="w-4 h-4"></i><span>Atama</span>
+    </button>
+    <button type="button" data-mob-nav="menu6" class="mob-nav-btn flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] text-slate-500">
+      <i data-lucide="table-2" class="w-4 h-4"></i><span>Program</span>
+    </button>
+    <button type="button" data-mob-nav="duty" class="mob-nav-btn flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] text-slate-500">
+      <i data-lucide="shield" class="w-4 h-4"></i><span>Nöbet</span>
+    </button>
+    <button type="button" data-mob-nav="menu7" class="mob-nav-btn flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] text-slate-500">
+      <i data-lucide="cloud" class="w-4 h-4"></i><span>Yedek</span>
+    </button>
+  </nav>
+
   <!-- Toast -->
-  <div id="toast" class="fixed bottom-5 right-5 z-50 hidden items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-medium shadow-lg border border-slate-700">
+  <div id="toast" class="fixed bottom-20 lg:bottom-5 right-4 lg:right-5 z-50 hidden items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-medium shadow-lg border border-slate-700">
     <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
     <span id="toastText">Kaydedildi</span>
   </div>
@@ -1938,6 +1971,7 @@
   <script src="./duty_module.js"></script>
   <script src="./evrakplus_ui.js"></script>
   <script src="./system_ui.js"></script>
+  <script src="./pwa_install.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
