@@ -15,7 +15,7 @@
   let currentSession = {
     loggedIn: false,
     baseUrl: 'https://www.evrakplus.com',
-    registerUrl: 'https://www.evrakplus.com/wp-login.php?action=register',
+    registerUrl: 'https://www.evrakplus.com/giris/',
     accountUrl: 'https://www.evrakplus.com/hesabim/',
     user: null,
     entitlement: { exportAllowed: false, status: 'unauthenticated', offlineValid: false, offlineExpired: false, offlineRemainingDays: 0 }

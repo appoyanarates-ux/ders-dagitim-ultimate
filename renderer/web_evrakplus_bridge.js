@@ -152,7 +152,7 @@
           loggedIn: false,
           isWebBridge: true,
           baseUrl,
-          registerUrl: `${baseUrl}/wp-login.php?action=register`,
+          registerUrl: `${baseUrl}/giris/`,
           accountUrl: `${baseUrl}/hesabim/`,
           user: null,
           deviceId: null,
@@ -163,7 +163,7 @@
         loggedIn: true,
         isWebBridge: true,
         baseUrl,
-        registerUrl: `${baseUrl}/wp-login.php?action=register`,
+        registerUrl: `${baseUrl}/giris/`,
         accountUrl: session.user.account_url || `${baseUrl}/hesabim/`,
         user: {
           id: session.user.id,

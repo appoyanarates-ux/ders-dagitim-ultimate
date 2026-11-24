@@ -166,7 +166,7 @@ class EvrakPlusClient {
       return {
         loggedIn: false,
         baseUrl: this.baseUrl,
-        registerUrl: `${this.baseUrl}/wp-login.php?action=register`,
+        registerUrl: `${this.baseUrl}/giris/`,
         accountUrl: `${this.baseUrl}/hesabim/`,
         user: null,
         deviceId: null,
@@ -177,7 +177,7 @@ class EvrakPlusClient {
     return {
       loggedIn: true,
       baseUrl: this.baseUrl,
-      registerUrl: `${this.baseUrl}/wp-login.php?action=register`,
+      registerUrl: `${this.baseUrl}/giris/`,
       accountUrl: this.session.user.account_url || `${this.baseUrl}/hesabim/`,
       user: {
         id: this.session.user.id,
