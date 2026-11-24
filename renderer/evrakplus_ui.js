@@ -23,6 +23,19 @@
   let pendingLogin = null; // { deviceCode, userCode, verificationUrl, timerId }
   let pendingPostLoginCallback = null;
   let activeConflict = null;
+  let autoSyncTimer = null;
+  let isSyncInFlight = false;
+  let lastAutoPullCheckMs = 0;
+
+  function getEvrakPlusBridge() {
+    if (window.dersDagitimAPI && typeof window.dersDagitimAPI.evrakplusGetSession === 'function') {
+      return window.dersDagitimAPI;
+    }
+    if (window.EvrakPlusWebBridge && typeof window.EvrakPlusWebBridge.evrakplusGetSession === 'function') {
+      return window.EvrakPlusWebBridge;
+    }
+    return null;
+  }
 
   function el(id) { return document.getElementById(id); }
 
@@ -108,7 +121,7 @@
   }
 
   async function openExternalUrl(url) {
-    const api = window.dersDagitimAPI;
+    const api = getEvrakPlusBridge();
     if (api && typeof api.evrakplusOpenUrl === 'function') {
       try {
         await api.evrakplusOpenUrl(url);
@@ -150,13 +163,13 @@
   }
 
   async function startDeviceLoginFlow() {
-    const api = window.dersDagitimAPI;
+    const api = getEvrakPlusBridge();
     const errBox = el('epLoginErrorBox');
     if (errBox) { errBox.classList.add('hidden'); errBox.textContent = ''; }
 
     if (!api || typeof api.evrakplusStartLogin !== 'function') {
       if (errBox) {
-        errBox.textContent = 'Masaüstü EvrakPlus köprüsü algılanamadı. Web sürümünde tarayıcı oturumunuz kullanılır.';
+        errBox.textContent = 'EvrakPlus bağlantı köprüsü yüklenemedi. Lütfen sayfayı yenileyin.';
         errBox.classList.remove('hidden');
       }
       return;
@@ -171,7 +184,11 @@
       if (idleBox) idleBox.classList.add('hidden');
       if (pendBox) pendBox.classList.remove('hidden');
       if (codeEl) codeEl.textContent = res.userCode || '—';
-      if (statusEl) statusEl.textContent = 'Tarayıcıda onay bekleniyor...';
+      if (statusEl) {
+        statusEl.textContent = res.popupBlocked
+          ? 'Açılır pencere engellendi — aşağıdaki "Onay Sayfasını Tekrar Aç" butonuna dokunup girişi onaylayın.'
+          : 'Tarayıcıda onay bekleniyor...';
+      }
 
       const intervalMs = Math.max(2500, (res.interval || 3) * 1000);
       const timerId = setInterval(async () => {
@@ -217,9 +234,8 @@
   }
 
   async function refreshSessionOnStartup() {
-    const api = window.dersDagitimAPI;
+    const api = getEvrakPlusBridge();
     if (!api || typeof api.evrakplusGetSession !== 'function') {
-      // Tarayıcı/PWA önizlemesi: yerel geliştirme durumunda oturum kapalı başlar
       renderSidebarAuth();
       return;
     }
@@ -234,6 +250,8 @@
         } catch (_offlineErr) {
           // Çevrimdışıysa yerel imzalı 7 günlük yetki korunur
         }
+        // Bulut senkronizasyonu açıksa sunucudaki güncel sürümü kontrol et
+        pullLatestIfRemoteNewer({ silent: true });
       }
     } catch (_err) {
       renderSidebarAuth();
@@ -241,7 +259,7 @@
   }
 
   async function handleLogout() {
-    const api = window.dersDagitimAPI;
+    const api = getEvrakPlusBridge();
     if (api && typeof api.evrakplusLogout === 'function') {
       const res = await api.evrakplusLogout();
       currentSession = res.session || { loggedIn: false, user: null, entitlement: { exportAllowed: false } };
@@ -263,18 +281,20 @@
     appHooks.saveToLocalArchive(title, snapshot);
   }
 
-  async function syncCurrentProjectToCloud({ force = false, asNewProject = false } = {}) {
+  async function syncCurrentProjectToCloud({ force = false, asNewProject = false, silent = false } = {}) {
     if (!currentSession || !currentSession.loggedIn) {
+      if (silent) return;
       openGateModal('Bulut senkronizasyonu için ücretsiz EvrakPlus hesabınızla giriş yapın.', () => {
         syncCurrentProjectToCloud({ force, asNewProject });
       });
       return;
     }
-    const api = window.dersDagitimAPI;
+    const api = getEvrakPlusBridge();
     if (!api || typeof api.evrakplusSyncProject !== 'function') {
-      if (appHooks) appHooks.showToast('Bulut senkronizasyonu için masaüstü bağlantısı gerekli.');
+      if (!silent && appHooks) appHooks.showToast('EvrakPlus bulut köprüsü kullanılamıyor.');
       return;
     }
+    if (isSyncInFlight) return;
 
     const st = appHooks.getState();
     const meta = ensureProjectMeta(st);
@@ -288,6 +308,7 @@
       meta.version = 0;
     }
 
+    isSyncInFlight = true;
     setSyncBadge('saving');
     try {
       const titleInput = el('m7ProjectTitle');
@@ -327,14 +348,80 @@
       meta.version = res.version;
       meta.lastSyncedAt = res.updatedAt || new Date().toISOString();
       meta.syncStatus = 'synced';
-      appHooks.saveState();
+      appHooks.saveState({ skipAutoSync: true });
       setSyncBadge('synced');
-      if (appHooks) appHooks.showToast(`Buluta kaydedildi (v${res.version})`);
+      if (!silent && appHooks) appHooks.showToast(`Buluta kaydedildi (v${res.version})`);
     } catch (err) {
       const isOffline = err.code === 'NETWORK_OFFLINE' || navigator.onLine === false;
       meta.syncStatus = isOffline ? 'offline' : 'error';
       setSyncBadge(meta.syncStatus);
-      if (appHooks) appHooks.showToast(err.message || 'Bulut senkronizasyonu başarısız.');
+      if (!silent && appHooks) appHooks.showToast(err.message || 'Bulut senkronizasyonu başarısız.');
+    } finally {
+      isSyncInFlight = false;
+    }
+  }
+
+  function notifyLocalChange() {
+    if (!appHooks || !currentSession || !currentSession.loggedIn) return;
+    const st = appHooks.getState();
+    if (!st || !st.cloudMeta || !st.cloudMeta.cloudSyncEnabled) return;
+    if (st.cloudMeta.syncStatus === 'conflict') return;
+
+    st.cloudMeta.syncStatus = navigator.onLine === false ? 'offline' : 'pending';
+    setSyncBadge(st.cloudMeta.syncStatus);
+
+    if (autoSyncTimer) clearTimeout(autoSyncTimer);
+    if (navigator.onLine === false) return;
+
+    autoSyncTimer = setTimeout(() => {
+      autoSyncTimer = null;
+      syncCurrentProjectToCloud({ force: false, silent: true });
+    }, 3500);
+  }
+
+  async function pullLatestIfRemoteNewer({ silent = true } = {}) {
+    if (!appHooks || !currentSession || !currentSession.loggedIn) return;
+    if (navigator.onLine === false || isSyncInFlight) return;
+    const now = Date.now();
+    if (now - lastAutoPullCheckMs < 8000) return;
+    lastAutoPullCheckMs = now;
+
+    const st = appHooks.getState();
+    if (!st || !st.cloudMeta || !st.cloudMeta.cloudSyncEnabled || !st.cloudMeta.projectUuid) return;
+    if (st.cloudMeta.syncStatus === 'conflict') return;
+
+    // Bekleyen yerel değişiklik varsa önce onu gönder (çakışma varsa 409 modalı açılır)
+    if (st.cloudMeta.syncStatus === 'pending' || st.cloudMeta.syncStatus === 'offline') {
+      await syncCurrentProjectToCloud({ force: false, silent: true });
+      return;
+    }
+
+    const api = getEvrakPlusBridge();
+    if (!api || typeof api.evrakplusGetProject !== 'function') return;
+    try {
+      const full = await api.evrakplusGetProject(st.cloudMeta.projectUuid);
+      const serverVer = Number(full && full.version) || 0;
+      const localVer = Number(st.cloudMeta.version) || 0;
+      if (full && full.payload && serverVer > localVer) {
+        const loaded = full.payload;
+        loaded.cloudMeta = {
+          projectUuid: full.project_uuid,
+          version: serverVer,
+          cloudSyncEnabled: true,
+          lastSyncedAt: full.updated_at || new Date().toISOString(),
+          syncStatus: 'synced'
+        };
+        appHooks.loadExternalState(loaded);
+        setSyncBadge('synced');
+        if (appHooks.showToast) {
+          appHooks.showToast(`Diğer cihazdaki güncel sürüm alındı (v${serverVer})`);
+        }
+      }
+    } catch (_err) {
+      // 404 (henüz buluta kaydedilmemiş) veya ağ hatası sessizce yoksayılır
+      if (!silent && appHooks.showToast) {
+        appHooks.showToast('Bulut sürümü kontrol edilemedi.');
+      }
     }
   }
 
@@ -352,7 +439,7 @@
   async function refreshCloudProjectsList() {
     const listEl = el('epCloudProjectsList');
     const statusEl = el('epCloudListStatus');
-    const api = window.dersDagitimAPI;
+    const api = getEvrakPlusBridge();
     if (!listEl || !api || typeof api.evrakplusListProjects !== 'function') return;
 
     if (statusEl) statusEl.textContent = 'Bulut projeleri yükleniyor...';
@@ -501,11 +588,19 @@
     });
 
     window.addEventListener('online', () => {
-      if (currentSession.loggedIn) refreshSessionOnStartup();
+      if (currentSession.loggedIn) {
+        refreshSessionOnStartup();
+        pullLatestIfRemoteNewer({ silent: true });
+      }
     });
     window.addEventListener('offline', () => {
       const st = appHooks && appHooks.getState();
       if (st && st.cloudMeta && st.cloudMeta.cloudSyncEnabled) setSyncBadge('offline');
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && currentSession.loggedIn) {
+        pullLatestIfRemoteNewer({ silent: true });
+      }
     });
   }
 
@@ -520,6 +615,8 @@
     openLoginModal,
     openCloudProjectsModal,
     syncCurrentProjectToCloud,
+    notifyLocalChange,
+    pullLatestIfRemoteNewer,
     getSession: () => currentSession,
     refreshSidebar: renderSidebarAuth
   };

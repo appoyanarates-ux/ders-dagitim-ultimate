@@ -651,8 +651,11 @@ function loadState() {
   }
 }
 
-function saveState() {
+function saveState(opts) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  if ((!opts || !opts.skipAutoSync) && window.EvrakPlusUI && typeof window.EvrakPlusUI.notifyLocalChange === 'function') {
+    window.EvrakPlusUI.notifyLocalChange();
+  }
 }
 
 let state = loadState();
@@ -5460,7 +5463,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (window.EvrakPlusUI && typeof window.EvrakPlusUI.init === 'function') {
     window.EvrakPlusUI.init({
       getState: () => state,
-      saveState: () => saveState(),
+      saveState: (opts) => saveState(opts),
       showToast: (msg) => showToast(msg),
       saveToLocalArchive: (title, snapshot) => {
         const archive = loadProjectArchive();
@@ -5480,7 +5483,7 @@ document.addEventListener('DOMContentLoaded', () => {
       loadExternalState: (loaded) => {
         if (!loaded || typeof loaded !== 'object') return;
         state = normalizeState(loaded);
-        saveState();
+        saveState({ skipAutoSync: true });
         renderAll();
         if (window.EvrakPlusUI) window.EvrakPlusUI.refreshSidebar();
       }

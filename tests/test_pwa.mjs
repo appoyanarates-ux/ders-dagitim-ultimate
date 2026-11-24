@@ -56,4 +56,121 @@ test('Mobil PWA: Manifest, gerçek PNG simgeler (180/192/512), Service Worker, i
   assert.ok(html.includes('id="btnMobilePwaInstall"'));
   assert.ok(html.includes('id="mobileBottomNav"'));
   assert.ok(html.includes('./pwa_install.js'));
+  assert.ok(html.includes('./web_evrakplus_bridge.js'));
+});
+
+test('Web/Mobil PWA EvrakPlus Köprüsü: cihaz eşleştirme, proje senkronizasyonu, 409 çakışma ve token yenileme', async () => {
+  const { createRequire } = await import('node:module');
+  const req = createRequire(import.meta.url);
+  const { createWebEvrakPlusBridge, isAllowedExternalUrl } = req('../renderer/web_evrakplus_bridge.js');
+
+  assert.equal(isAllowedExternalUrl('https://evrakplus.com/evrakplus-cihaz-onay/?code=ABC', 'https://www.evrakplus.com'), true);
+  assert.equal(isAllowedExternalUrl('http://evrakplus.com/insecure', 'https://www.evrakplus.com'), false);
+  assert.equal(isAllowedExternalUrl('https://evil.example.com/phish', 'https://www.evrakplus.com'), false);
+
+  const mem = new Map();
+  const storage = {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => mem.set(k, String(v)),
+    removeItem: (k) => mem.delete(k)
+  };
+
+  let syncCalls = 0;
+  let force401Once = true;
+  const mockFetch = async (url, init) => {
+    const body = init.body ? JSON.parse(init.body) : null;
+    if (url.endsWith('/auth/device')) {
+      return {
+        status: 200, ok: true,
+        text: async () => JSON.stringify({
+          device_code: 'dev_123',
+          user_code: 'ABCD-1234',
+          verification_url: 'https://evrakplus.com/evrakplus-cihaz-onay/?code=ABCD-1234',
+          interval: 3
+        })
+      };
+    }
+    if (url.endsWith('/auth/token') && body.grant_type === 'device_code') {
+      return {
+        status: 200, ok: true,
+        text: async () => JSON.stringify({
+          device_id: 'mob_1',
+          access_token: 'tok_initial',
+          refresh_token: 'ref_1',
+          expires_at: '2027-01-01T00:00:00Z',
+          user: { id: 7, full_name: 'Ayşe Yılmaz', email: 'ayse@evrakplus.com' },
+          entitlement: { signed_token: 'sig_ok', expires_at: '2027-01-01T00:00:00Z', can_export_pdf: true, can_export_excel: true }
+        })
+      };
+    }
+    if (url.endsWith('/auth/token') && body.grant_type === 'refresh_token') {
+      return {
+        status: 200, ok: true,
+        text: async () => JSON.stringify({
+          access_token: 'tok_refreshed',
+          refresh_token: 'ref_2',
+          expires_at: '2027-01-01T00:00:00Z'
+        })
+      };
+    }
+    if (url.endsWith('/projects') && init.method === 'GET') {
+      if (force401Once) {
+        force401Once = false;
+        return { status: 401, ok: false, text: async () => JSON.stringify({ message: 'expired' }) };
+      }
+      assert.equal(init.headers.Authorization, 'Bearer tok_refreshed');
+      return { status: 200, ok: true, text: async () => JSON.stringify({ projects: [{ project_uuid: 'prj_1', title: 'Atatürk OO', version: 2 }] }) };
+    }
+    if (url.includes('/projects/prj_1/sync')) {
+      syncCalls += 1;
+      if (syncCalls === 1) {
+        return {
+          status: 409, ok: false,
+          text: async () => JSON.stringify({ server_version: 3, server_project: { project_uuid: 'prj_1', version: 3, payload: { school: { name: 'Atatürk OO' } } } })
+        };
+      }
+      return {
+        status: 200, ok: true,
+        text: async () => JSON.stringify({ id: 1, project_uuid: 'prj_1', version: 4, updated_at: '2026-11-24T07:00:00Z', payload_size: 1024 })
+      };
+    }
+    if (url.endsWith('/auth/logout')) {
+      return { status: 200, ok: true, text: async () => JSON.stringify({ ok: true }) };
+    }
+    return { status: 404, ok: false, text: async () => '{}' };
+  };
+
+  const bridge = createWebEvrakPlusBridge({
+    baseUrl: 'https://evrakplus.com',
+    storage,
+    fetchImpl: mockFetch,
+    openWindow: () => null // mobil popup engeli simülasyonu
+  });
+
+  const started = await bridge.evrakplusStartLogin({ openBrowser: true });
+  assert.equal(started.userCode, 'ABCD-1234');
+  assert.equal(started.popupBlocked, true);
+
+  const poll = await bridge.evrakplusPollLogin('dev_123');
+  assert.equal(poll.status, 'approved');
+  assert.equal(poll.session.loggedIn, true);
+  assert.equal(poll.session.user.full_name, 'Ayşe Yılmaz');
+
+  // 401 -> otomatik refresh_token -> tekrar istek
+  const list = await bridge.evrakplusListProjects();
+  assert.equal(list.length, 1);
+  assert.equal(list[0].project_uuid, 'prj_1');
+
+  // 409 çakışma + force senkronizasyon
+  const conflict = await bridge.evrakplusSyncProject({ projectUuid: 'prj_1', baseVersion: 2, title: 'Atatürk OO', payload: {} });
+  assert.equal(conflict.status, 'conflict');
+  assert.equal(conflict.serverVersion, 3);
+
+  const synced = await bridge.evrakplusSyncProject({ projectUuid: 'prj_1', baseVersion: 3, title: 'Atatürk OO', payload: {}, force: true });
+  assert.equal(synced.status, 'synced');
+  assert.equal(synced.version, 4);
+
+  const out = await bridge.evrakplusLogout();
+  assert.equal(out.loggedOut, true);
+  assert.equal(out.session.loggedIn, false);
 });
