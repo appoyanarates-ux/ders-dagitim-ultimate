@@ -5499,6 +5499,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.EvrakPlusUI) window.EvrakPlusUI.refreshSidebar();
       }
     });
+  }
   if (window.EvrakPlusPWA && typeof window.EvrakPlusPWA.init === 'function') {
     window.EvrakPlusPWA.init({
       showToast: (msg) => showToast(msg),

@@ -2,11 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
 const rendererDir = path.join(projectRoot, 'renderer');
+
+test('Tüm renderer/*.js ve electron/*.cjs dosyaları sözdizimi (node --check) kontrolünden geçer', () => {
+  for (const dir of [rendererDir, path.join(projectRoot, 'electron')]) {
+    for (const file of fs.readdirSync(dir)) {
+      if (file.endsWith('.js') || file.endsWith('.cjs')) {
+        execFileSync(process.execPath, ['--check', path.join(dir, file)], { stdio: 'pipe' });
+      }
+    }
+  }
+});
 
 test('Mobil PWA: Manifest, gerçek PNG simgeler (180/192/512), Service Worker, iOS/Android meta ve alt mobil menü', () => {
   const manifestPath = path.join(rendererDir, 'manifest.webmanifest');
